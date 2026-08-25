@@ -1,0 +1,5 @@
+research/
+.creds.json
+.git-identity
+*.log
+node_modules/
