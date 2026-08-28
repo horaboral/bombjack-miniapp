@@ -1,5 +1,13 @@
 research/
+refs/
 .creds.json
 .git-identity
 *.log
 node_modules/
+# local diagnostics / session artifacts (do not ship in public repo)
+throughput.py
+trunc-test/
+HANDOFF-bombjack.md
+smoke.js
+chunk*.js
+chunkcheck_*.js

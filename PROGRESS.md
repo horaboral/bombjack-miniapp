@@ -1,18 +1,29 @@
 # Bomb Jack Mini-App — PROGRESS (read this FIRST in any new session)
 
-Last updated: 3rd BSOD recovered. Remote backup LIVE (repo pushed, commit 8db87bf). Credentials stored. Touch controls v2 finalized (docs/CONTROLS.md). BSOD cause identified: NVIDIA 0x113 TDR.
+Last updated: FULL GAME BUILT + PUSHED (commits 17cbcf7, acbe6e8). Smoke-tested headless (PASS). GitHub Pages still provisioning (404 on create, background retry running). Reasoning OFF applied to qwen38 (settings.yaml).
 
 ## State
 - **Phase 0 Research & plan: DONE** → docs/GAME-SPEC.md, PLAN.md, research/ artifacts.
-- **Phase 1: REPO LIVE** → `horaboral/bombjack-miniapp` created + pushed (commit 8db87bf: .gitignore, PLAN, PROGRESS, GAME-SPEC). Pages: API PUT → 404, retry = research/pages.py. `bombjack.html`: NOT started.
-- **Phase 2 Palette: mostly DONE** (pre-repo) → research/visual-notes.md (layout + working palette), palette-full.json/palette-wiki3.json (quantitative). Final hex tuning happens when CONFIG is written. VIDEO is the canonical visual reference (see Facts).
-- **BSOD (5 crashes 8/25–8/28, all identical)**: bugcheck 0x113 VIDEO_TIMEOUT_DETECTED (0x19,0x2,0x10de,0x2204) = NVIDIA RTX 3090 TDR crash under sustained load. Correlation: retake/compact = biggest single inference = GPU peak. Mitigations: user's 280W limit; we keep context lean (small images, small writes, delegate to subagents). Minidumps: C:\WINDOWS\Minidump\082826-*.dmp.
+- **Phase 1: REPO LIVE** → `horaboral/bombjack-miniapp` created + pushed. Latest commit `acbe6e8`.
+- **Phase 2 Palette: DONE** — 5 screens with palettes in bombjack.html SCREENS array. VIDEO is canonical visual reference.
+- **Phases 3–7 (game core): DONE** → single `bombjack.html` (34KB, 6 `<script>` blocks, all node --check clean + headless smoke PASS):
+  - Title / PLAY / ROUNDCLEAR / GAMEOVER / INITIALS state machine; fixed 60Hz loop.
+  - 5 screens (pyramid, Greek, castle, skyscraper, night) cycling by round%5; per-screen sky/bezel/plat/ground colors + platforms + 24 bombs each.
+  - 24-bomb lit sequence: all red/fixed until first pickup, then 1 lights per 40 ticks (black, slow patrol); 100/200 × mult; round bonus 20/21/22/23 lit = 10k/20k/30k/50k; round-clear check AFTER pickup loop (bug fixed in acbe6e8).
+  - Enemies spawn from top (≤6): bird/mummy/UFO/orb + ground↔air morph, escalating speed.
+  - Power-ups P(freeze)/B(+mult +coins)/E(+life)/S(touch-kill) in hexagons; bonus meter → powerup; coins.
+  - Touch controls per CONTROLS.md v2: left-45% relative-drag steer (dead-zone/full-px), right-55% tap/hold jump + mid-air glide + fast-fall; pointerId multi-touch; HapticFeedback; landscape "ROTATE" overlay; desktop arrows+space.
+  - WebAudio bleeps (user-gesture gated), Telegram SDK CDN + shim + MainButton + expand, hi-score + initials in localStorage, lives/extra-life@50k, screen-space JUMP button + steer-stick visuals.
+- **GitHub Pages: PENDING** — repo public, `has_pages=false`. PUT /pages → 404 (fine-grained PAT has Pages WRITE, verified via tetris PUT→204). 404 = GitHub hasn't provisioned the new repo's Pages backend yet; background pwsh job polls PUT every 30s. Once 2xx: verify https://horaboral.github.io/bombjack-miniapp/.
+- **Reasoning OFF: DONE** — settings.yaml qwen38 entry now has `reasoningEfforts` + `compat.thinkingFormat: chat-template` + `chatTemplateKwargs.enable_thinking: false`. Verified: test prompt completion_tokens 33→2, no reasoning_content. Hot-reloaded, applies from next model call. vLLM entries intentionally unchanged.
+- **BSOD (5 crashes 8/25–8/28, all identical)**: bugcheck 0x113 = NVIDIA RTX 3090 TDR. Mitigations: 280W limit, lean context, small writes, subagents. Minidumps: C:\WINDOWS\Minidump\082826-*.dmp.
 
 ## Next actions (in order)
-1. Retry GitHub Pages (research/pages.py — needs elevated run) + verify https://horaboral.github.io/bombjack-miniapp/ after first html push.
-2. Write `bombjack.html` skeleton: viewport meta, touch-action none, landscape-lock overlay, full-bleed canvas, Telegram SDK + fallback shim (copy pattern from research/tetris-ref/tetris.html lines 5-36), title screen "BOMB JACK — TAP TO START", fixed-60Hz loop.
-3. Implement controls per docs/CONTROLS.md v2: left 45% relative-drag steer, right 55% tap/hold jump + mid-air tap glide, multi-touch pointerId, HapticFeedback, landscape overlay.
-4. Phases 2-9 per PLAN.md. Push after EVERY phase.
+1. GitHub Pages: wait for background PUT to return 2xx (or re-run research/pages.py), then verify the live URL and report to user.
+2. **USER PLAYTEST** (fidelity loop, PLAN.md §5): user plays 2 min → what feels off? Update docs/FIDELITY.md delta table; iterate.
+3. Phase 8: wire to Telegram bot 8699678610 (menuButton / webhook or long-poll) so the mini-app is reachable in Telegram.
+4. Phase 9: polish + final push.
+5. Repo hygiene: `refs/watch.html` (1.1MB YouTube HTML), `throughput.py`, `trunc-test/` are untracked leftovers — `refs/` must NOT be in the public repo; confirm .gitignore covers them or delete.
 
 ## Facts already learned (do NOT re-research)
 - Target = Tehkan 1984 ARCADE Bomb Jack (platformer). NOT Taito B-52. NOT NES Mighty Bomb Jack.
