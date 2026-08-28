@@ -52,3 +52,9 @@
 4. Hover limits on the platform-free screen.
 5. Sound: arcade had music chip; port = short WebAudio bleeps (no samples).
 6. Exact screen resolution / sprite pixel sizes (Tehkan Z80 board).
+
+## Corrections from user longplay review (2026-08-28, authoritative)
+- Bomb states: RED bombs are FIXED (unlit). LIT bombs turn BLACK and MOVE (patrol). Sequence lighting starts after first pickup.
+- Random power-up: makes enemies DESTRUCTIBLE BY CONTACT with Jack (touch kills).
+- Screen cycle order (from longplay ROUND numbers): 1=pyramid, 2=Greek acropolis, 3=castle, 4=skyscraper/harbor, 5=night street (no platforms).
+- Per-screen palettes: bezel + platform + sky colors change per screen (green/green/purple, orange/yellow/purple, gold/yellow/deep-blue, yellow/yellow/blue, cyan/none/near-black).
