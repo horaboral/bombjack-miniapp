@@ -11,6 +11,7 @@ Last updated: PLAYTEST ROUND 1 FIXES APPLIED (in progress — smoke/push pending
   - Lit bombs: max 2 move (most-recently-lit) with slow drift 0.035px/f; others light in place.
   - Powerups: spawn in-bounds (x 6..248, y 30..100), bounce off walls, 900-tick TTL.
   - Music: 32-step square-lead + triangle-bass chiptune; starts on newGame (gesture-gated), stops on game over.
+  - VERIFIED: 6/6 script blocks node --check clean; headless smoke PASS (letterbox SC=2.163 exact, L/R zones correct, no NaN over 6000 ticks, powerups in-bounds, max 1-2 lit bombs actively moving, all 5 states render). Committed `f8cb6ed` + pushed to main.
 - **Phase 0 Research & plan: DONE** → docs/GAME-SPEC.md, PLAN.md, research/ artifacts.
 - **Phase 1: REPO LIVE** → `horaboral/bombjack-miniapp` created + pushed. Latest commit `acbe6e8`.
 - **Phase 2 Palette: DONE** — 5 screens with palettes in bombjack.html SCREENS array. VIDEO is canonical visual reference.
