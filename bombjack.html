@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -272,17 +272,18 @@ function respawn() {
 // ================= BOMBS =======================================================
 function bombStep() {
   const active = G.bombs.filter(b => !b.got);
-  if (active.length === G.bombs.length && G.bombsGot === 0) {
-    // sequence not started: all red, fixed
-  } else {
-    for (const b of active) {
-      if (b.lit) {
-        b.pat += 0.02;
-        b.x += Math.cos(b.pat) * 0.06;   // lit (black) bombs patrol slowly
-      } else if (G.litCount < active.length - 1) {
-        G.litCount++;
-        for (const o of active) { if (!o.lit) { o.lit = true; break; } }
-      }
+  if (G.bombsGot > 0) {
+    // sequence started: remaining bombs light one per 40 ticks
+    G.litTimer = (G.litTimer || 0) + 1;
+    if (G.litTimer >= 40) {
+      G.litTimer = 0;
+      for (const b of active) { if (!b.lit) { b.lit = true; break; } }
+    }
+  }
+  for (const b of active) {
+    if (b.lit) {
+      b.pat += 0.02;
+      b.x += Math.cos(b.pat) * 0.06;   // lit (black) bombs patrol slowly
     }
   }
   // pickup
@@ -298,9 +299,9 @@ function bombStep() {
       if (b.lit) { G.litThisRound++; }
       if (G.meter >= 10) { G.meter = 0; spawnPowerup(); }
       haptic('light');
-      if (G.bombsGot >= 24) roundClear();
     }
   }
+  if (G.st === ST.PLAY && G.bombsGot >= 24) roundClear();
 }
 function roundClear() {
   let bonus = 0;
