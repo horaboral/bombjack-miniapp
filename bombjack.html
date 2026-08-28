@@ -60,10 +60,10 @@ html, body {
 const CFG = {
   W: 256, H: 192,          // logical playfield (inside bezel), 4:3
   FRAME: 8,                // bezel thickness
-  GRAV: 0.16,
+  GRAV: 0.15,
   RUN: 2.3,                // px/frame at full steer
-  JUMP_V: 3.15,
-  JUMP_HOLD: 0.045,        // extra up-accel while jump held & ascending
+  JUMP_V: 3.6,             // taller jump (user: barely reached upper platform)
+  JUMP_HOLD: 0.055,        // extra up-accel while jump held & ascending
   JUMP_CUT: 0.42,          // vy multiplier on early release
   GLIDE_V: 0.55,           // fall speed while gliding
   FAST_FALL: 0.6,          // extra fall accel steering down
@@ -98,16 +98,25 @@ const SCREENS = [
 // ================= CANVAS + VIEW ================================================
 const cv = document.getElementById('game');
 const cx = cv.getContext('2d');
-let VW = 0, VH = 0, SC = 1;
+let VW = 0, VH = 0, SC = 1, OX = 0, OY = 0;
 function fit() {
   VW = window.innerWidth; VH = window.innerHeight;
   const dpr = Math.min(2, window.devicePixelRatio || 1);
   cv.width = Math.round(VW * dpr); cv.height = Math.round(VH * dpr);
   cx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  // uniform scale + letterbox: no aspect distortion
   SC = Math.min(VW / (CFG.W + CFG.FRAME * 2), VH / (CFG.H + CFG.FRAME * 2));
+  OX = (VW - (CFG.W + CFG.FRAME * 2) * SC) / 2;
+  OY = (VH - (CFG.H + CFG.FRAME * 2) * SC) / 2;
 }
 window.addEventListener('resize', fit);
 window.addEventListener('orientationchange', fit);
+function toLogical(e) {
+  const r = cv.getBoundingClientRect();
+  const sx = (e.clientX - r.left - OX) / SC;
+  const sy = (e.clientY - r.top - OY) / SC;
+  return { x: sx - CFG.FRAME, y: sy - CFG.FRAME };
+}
 // ================= GAME STATE ==================================================
 const ST = { TITLE: 0, PLAY: 1, ROUNDCLEAR: 2, GAMEOVER: 3, INITIALS: 4 };
 const G = {
@@ -144,6 +153,7 @@ function addPop(x, y, txt, col) { G.pops.push({ x, y, txt, col: col || '#fff', t
 function newGame() {
   G.score = 0; G.lives = CFG.LIVES; G.round = 1; G.mult = 1; G.nextLifeAt = CFG.EXTRA_AT;
   G.st = ST.PLAY; setScreen(0);
+  musicStart();
 }
 function addScore(n) {
   G.score += n;
@@ -152,9 +162,8 @@ function addScore(n) {
 // ================= INPUT (zones per CONTROLS.md v2) ============================
 const IN = { sx: 0, sy: 0, jump: false, jumpQ: 0 };
 function zoneOf(e) {
-  const r = cv.getBoundingClientRect();
-  const x = e.clientX - r.left;
-  return x < VW * 0.45 ? 'L' : 'R';
+  const l = toLogical(e);
+  return l.x < CFG.W * 0.45 ? 'L' : 'R';
 }
 cv.addEventListener('pointerdown', e => {
   e.preventDefault();
@@ -270,20 +279,27 @@ function respawn() {
 </script>
 <script>
 // ================= BOMBS =======================================================
+// Only 1-2 lit bombs move at a time (user: not all over the place).
+// Others light up in place (black) but stay fixed.
+const LIT_MOVERS = 2;
 function bombStep() {
   const active = G.bombs.filter(b => !b.got);
   if (G.bombsGot > 0) {
-    // sequence started: remaining bombs light one per 40 ticks
+    // sequence started: remaining bombs light one per 45 ticks
     G.litTimer = (G.litTimer || 0) + 1;
-    if (G.litTimer >= 40) {
+    if (G.litTimer >= 45) {
       G.litTimer = 0;
       for (const b of active) { if (!b.lit) { b.lit = true; break; } }
     }
   }
+  // designate at most LIT_MOVERS lit bombs as movers (the most recently lit)
+  const litActive = active.filter(b => b.lit);
+  for (const b of litActive) b.mover = false;
+  for (let i = Math.max(0, litActive.length - LIT_MOVERS); i < litActive.length; i++) litActive[i].mover = true;
   for (const b of active) {
-    if (b.lit) {
-      b.pat += 0.02;
-      b.x += Math.cos(b.pat) * 0.06;   // lit (black) bombs patrol slowly
+    if (b.lit && b.mover) {
+      b.pat = (b.pat || 0) + 0.012;            // slow drift
+      b.x += Math.cos(b.pat) * 0.035;
     }
   }
   // pickup
@@ -318,12 +334,17 @@ const PU_LETTERS = ['P', 'B', 'E', 'S'];
 function spawnPowerup() {
   const r = Math.random();
   let L = r < 0.34 ? 'P' : r < 0.62 ? 'B' : r < 0.86 ? 'E' : 'S';
-  G.powerups.push({ x: -10, y: 24 + Math.random() * (CFG.H - 60), L, vx: 0.35, t: 0 });
+  // spawn within play area, above ground, below top HUD
+  G.powerups.push({ x: 6 + Math.random() * (CFG.W - 12), y: 30 + Math.random() * 70, L, vx: 0.35, t: 0 });
 }
 function powerupStep() {
   for (const pu of G.powerups) {
     pu.t++; pu.x += pu.vx;
-    if (pu.x > CFG.W + 12) pu.dead = true;
+    if (pu.x > CFG.W - 8) { pu.x = CFG.W - 8; pu.vx *= -1; }
+    if (pu.x < 8) { pu.x = 8; pu.vx *= -1; }
+    if (pu.y < 28) pu.y = 28;
+    if (pu.y > CFG.GROUND_Y - 8) pu.y = CFG.GROUND_Y - 8;
+    if (pu.t > 900) pu.dead = true;
     if (!pu.dead && !P.dead &&
         rectHit({ x: P.x, y: P.y, w: CFG.PLAYER_W, h: CFG.PLAYER_H }, { x: pu.x - 7, y: pu.y - 7, w: 14, h: 14 })) {
       pu.dead = true;
@@ -535,11 +556,31 @@ function drawBG(s, t) {
       if ((i + Math.floor(t / 40)) % 3 !== 0) g.fillRect(x, y, 1, 1);
     }
   } else if (s.name === 'PYRAMID') {
-    g.fillStyle = '#e8d890';
-    g.beginPath(); g.moveTo(20, 130); g.lineTo(70, 40); g.lineTo(120, 130); g.closePath(); g.fill();
-    g.fillStyle = '#c8b870';
-    g.beginPath(); g.moveTo(130, 130); g.lineTo(180, 60); g.lineTo(230, 130); g.closePath(); g.fill();
-    g.fillStyle = '#e8d890'; g.fillRect(150, 100, 24, 6); g.fillRect(146, 106, 32, 6);
+    // sun
+    g.fillStyle = '#fff8c0'; g.beginPath(); g.arc(214, 30, 9, 0, 6.29); g.fill();
+    // big pyramid: light left face, dark right face, baseline
+    g.fillStyle = '#f0dc98';
+    g.beginPath(); g.moveTo(140, 130); g.lineTo(70, 34); g.lineTo(70, 130); g.closePath(); g.fill();
+    g.fillStyle = '#c8a858';
+    g.beginPath(); g.moveTo(140, 130); g.lineTo(70, 34); g.lineTo(70, 130); g.closePath(); g.fill();
+    g.fillStyle = '#a8843c';
+    g.beginPath(); g.moveTo(140, 130); g.lineTo(70, 34); g.lineTo(140, 130); g.closePath(); g.fill();
+    // ridge line
+    g.strokeStyle = '#806020'; g.lineWidth = 1;
+    g.beginPath(); g.moveTo(70, 34); g.lineTo(140, 130); g.stroke();
+    // small pyramid right
+    g.fillStyle = '#e0c880';
+    g.beginPath(); g.moveTo(180, 130); g.lineTo(150, 70); g.lineTo(150, 130); g.closePath(); g.fill();
+    g.fillStyle = '#b09040';
+    g.beginPath(); g.moveTo(180, 130); g.lineTo(150, 70); g.lineTo(180, 130); g.closePath(); g.fill();
+    // sphinx silhouette
+    g.fillStyle = '#907030';
+    g.fillRect(186, 116, 22, 8);        // body
+    g.fillRect(180, 108, 10, 10);       // head
+    g.fillRect(178, 106, 6, 4);         // headdress
+    g.fillRect(196, 112, 12, 4);        // arm
+    g.fillStyle = '#705828';
+    g.fillRect(183, 111, 2, 2); g.fillRect(187, 111, 2, 2); // eyes
   } else if (s.name === 'GREEK') {
     g.fillStyle = '#d8d0e0';
     for (let i = 0; i < 5; i++) { g.fillRect(30 + i * 44, 60, 6, 70); g.fillRect(26 + i * 44, 56, 14, 5); }
@@ -603,7 +644,22 @@ function drawHUD() {
   if (G.msgT > 0) { txt(g, G.msg, CFG.W / 2 - g.measureText(G.msg).width / 2, 70, '#fff', 10); G.msgT--; }
 }
 function drawPlayer() {
-  if (P.dead) return;
+  if (P.dead) {
+    // death: Jack spins and bounces, fading
+    const t = 90 - G.deadT;                 // 0..90
+    const ang = t * 0.4;                     // spin
+    const bounce = Math.abs(Math.sin(t * 0.3)) * -10; // hop up
+    const y = P.y + bounce + Math.min(0, (t - 40) * 0.4);
+    const alpha = Math.max(0, 1 - t / 90);
+    cx.save();
+    cx.globalAlpha = alpha;
+    cx.translate(P.x + CFG.PLAYER_W / 2, y + CFG.PLAYER_H / 2);
+    cx.rotate(ang);
+    cx.scale(P.face, 1);
+    cx.drawImage(SPR.jack2, -CFG.PLAYER_W / 2, -CFG.PLAYER_H / 2, CFG.PLAYER_W, CFG.PLAYER_H);
+    cx.restore();
+    return;
+  }
   if (P.invuln > 0 && Math.floor(P.invuln / 4) % 2) return;
   let pose = 0;
   if (!P.grounded) pose = P.vy < 0 ? 2 : 1;
@@ -659,6 +715,23 @@ function beep(freq, dur, type, vol) {
   o.connect(gn); gn.connect(AC.destination);
   o.start(); o.stop(AC.currentTime + dur);
 }
+// ---- chiptune loop (scheduled per 60Hz tick, square lead + triangle bass) ----
+const N = { C4: 262, D4: 294, E4: 330, F4: 349, G4: 392, A4: 440, B4: 494, C5: 523, D5: 587, E5: 659, G5: 784, A5: 880, C6: 1047 };
+// 8-step lead melody (Hz, 0 = rest), 8-step bass, 32-step pattern
+const MELODY = [N.E4, N.G4, N.A4, N.G4, N.E4, N.D4, N.C4, N.D4, N.E4, N.G4, N.C5, N.G4, N.A4, N.B4, N.C5, N.D5, N.C5, N.B4, N.A4, N.G4, N.A4, N.G4, N.E4, N.G4, N.E4, N.D4, N.E4, N.D4, N.C4, 0, N.D4, N.E4];
+const BASS = [N.C4, 0, 0, 0, N.G4, 0, 0, 0, N.C4, 0, 0, 0, N.A4, 0, 0, 0];
+let musicStep = 0, musicOn = false;
+function musicStart() { if (AC && !musicOn) musicOn = true; }
+function musicStop() { musicOn = false; }
+function musicTick() {
+  if (!AC || !musicOn || G.st !== ST.PLAY) return;
+  const s16 = musicStep % 16;
+  const m = MELODY[musicStep % 32];
+  if (m) beep(m, 0.09, 'square', 0.028);
+  const b = BASS[s16];
+  if (b) beep(b / 2, 0.12, 'triangle', 0.05);
+  musicStep++;
+}
 function haptic(kind) {
   try {
     const H = Telegram.WebApp && Telegram.WebApp.HapticFeedback;
@@ -682,6 +755,7 @@ function tick() {
     powerupStep();
     coinStep();
     enemyStep();
+    musicTick();
     for (const p of G.pops) { p.y -= 0.4; p.t--; }
     G.pops = G.pops.filter(p => p.t > 0);
     if (P.dead) {
@@ -690,6 +764,7 @@ function tick() {
         G.lives--;
         if (G.lives < 0) {
           G.st = ST.GAMEOVER;
+          musicStop();
           if (G.score > G.hi) { G.hi = G.score; localStorage.setItem('bj_hi', G.hi); G.st = ST.INITIALS; }
           haptic('heavy');
         } else respawn();
@@ -720,7 +795,7 @@ function tick() {
 function render() {
   cx.save();
   if (G.shake > 0) cx.translate((Math.random() - 0.5) * G.shake, (Math.random() - 0.5) * G.shake);
-  cx.translate((VW - CFG.W * SC) / 2, (VH - CFG.H * SC) / 2);
+  cx.translate(OX + CFG.FRAME * SC, OY + CFG.FRAME * SC);
   cx.scale(SC, SC);
   if (G.st === ST.TITLE) {
     cx.fillStyle = '#101040'; cx.fillRect(0, 0, CFG.W, CFG.H);

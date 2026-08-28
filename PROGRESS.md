@@ -1,8 +1,16 @@
 # Bomb Jack Mini-App — PROGRESS (read this FIRST in any new session)
 
-Last updated: FULL GAME BUILT + PUSHED (commits 17cbcf7, acbe6e8). Smoke-tested headless (PASS). GitHub Pages still provisioning (404 on create, background retry running). Reasoning OFF applied to qwen38 (settings.yaml).
+Last updated: PLAYTEST ROUND 1 FIXES APPLIED (in progress — smoke/push pending). GitHub Pages still 404 (manual Settings→Pages step likely needed). Reasoning OFF applied to qwen38 (settings.yaml).
 
 ## State
+- **Playtest Round 1 (2026-08-29): FIXES APPLIED, VERIFYING** — user feedback: "aspect ratio is off, pyramids badly drawn, jump too low, death sequence off (jack disappears), lit bombs all over the place + deadly, powerups spill out of play area, music absent".
+  - Aspect: uniform letterbox (SC=fit + OX/OY centering), render translate fixed, pointer zones remapped through toLogical() so L/R zones track the playfield.
+  - Pyramid bg: two-face shaded pyramids + sun + sphinx silhouette (replaced flat triangles).
+  - Jump: JUMP_V 3.15→3.6, GRAV 0.16→0.15, JUMP_HOLD 0.045→0.055 (reaches upper platforms).
+  - Death: spin+hop+fade animation over deadT (was instant disappear).
+  - Lit bombs: max 2 move (most-recently-lit) with slow drift 0.035px/f; others light in place.
+  - Powerups: spawn in-bounds (x 6..248, y 30..100), bounce off walls, 900-tick TTL.
+  - Music: 32-step square-lead + triangle-bass chiptune; starts on newGame (gesture-gated), stops on game over.
 - **Phase 0 Research & plan: DONE** → docs/GAME-SPEC.md, PLAN.md, research/ artifacts.
 - **Phase 1: REPO LIVE** → `horaboral/bombjack-miniapp` created + pushed. Latest commit `acbe6e8`.
 - **Phase 2 Palette: DONE** — 5 screens with palettes in bombjack.html SCREENS array. VIDEO is canonical visual reference.
@@ -19,11 +27,12 @@ Last updated: FULL GAME BUILT + PUSHED (commits 17cbcf7, acbe6e8). Smoke-tested 
 - **BSOD (5 crashes 8/25–8/28, all identical)**: bugcheck 0x113 = NVIDIA RTX 3090 TDR. Mitigations: 280W limit, lean context, small writes, subagents. Minidumps: C:\WINDOWS\Minidump\082826-*.dmp.
 
 ## Next actions (in order)
-1. GitHub Pages: wait for background PUT to return 2xx (or re-run research/pages.py), then verify the live URL and report to user.
-2. **USER PLAYTEST** (fidelity loop, PLAN.md §5): user plays 2 min → what feels off? Update docs/FIDELITY.md delta table; iterate.
-3. Phase 8: wire to Telegram bot 8699678610 (menuButton / webhook or long-poll) so the mini-app is reachable in Telegram.
-4. Phase 9: polish + final push.
-5. Repo hygiene: `refs/watch.html` (1.1MB YouTube HTML), `throughput.py`, `trunc-test/` are untracked leftovers — `refs/` must NOT be in the public repo; confirm .gitignore covers them or delete.
+1. Finish round-1 verification: node --check all blocks + headless smoke + git commit/push.
+2. **USER PLAYTEST ROUND 2** (fidelity loop, PLAN.md §5): user plays 2 min → what feels off? Iterate.
+3. GitHub Pages: repo has never returned 2xx from API (404s for 40+ min) — user must do the manual step: GitHub → horaboral/bombjack-miniapp → Settings → Pages → Deploy from a branch → main / (root) → Save. Then verify https://horaboral.github.io/bombjack-miniapp/.
+4. Phase 8: wire to Telegram bot 8699678610 (menuButton / webhook or long-poll) so the mini-app is reachable in Telegram.
+5. Phase 9: polish + final push.
+6. Repo hygiene: `refs/watch.html` (1.1MB YouTube HTML), `throughput.py`, `trunc-test/` are untracked leftovers — `refs/` must NOT be in the public repo; confirm .gitignore covers them or delete.
 
 ## Facts already learned (do NOT re-research)
 - Target = Tehkan 1984 ARCADE Bomb Jack (platformer). NOT Taito B-52. NOT NES Mighty Bomb Jack.
