@@ -1,9 +1,13 @@
 # Bomb Jack Mini-App — PROGRESS (read this FIRST in any new session)
 
-Last updated: PLAYTEST ROUND 1 FIXES APPLIED (in progress — smoke/push pending). GitHub Pages still 404 (manual Settings→Pages step likely needed). Reasoning OFF applied to qwen38 (settings.yaml).
+Last updated: PLAYTEST ROUND 2 VERTICAL REWORK DONE + PUSHED (`16ce059`). GitHub Pages still 404 (manual Settings→Pages step likely needed). Reasoning OFF applied to qwen38 (settings.yaml).
 
 ## State
-- **Playtest Round 1 (2026-08-29): FIXES APPLIED, VERIFYING** — user feedback: "aspect ratio is off, pyramids badly drawn, jump too low, death sequence off (jack disappears), lit bombs all over the place + deadly, powerups spill out of play area, music absent".
+- **Playtest Round 2 (2026-08-29): VERTICAL REWORK, PUSHED** — user feedback: aspect still wrong (game is VERTICAL), no rotate prompt, backgrounds need real-world palettes, sprites too sketchy (cute+detail, higher res), platform 2 unreachable screen 2, initials need tap wheel (no keyboard), controls invisible, fingerprint on left control, game fills phone screen, Jack = MOUSE (caped cute mouse), mummies should be mummies, enemies → assign species + cute.
+  - Confirmed decisions: tall 9:16 field 144x256 full portrait screen; single-finger (drag anywhere = steer, tap = jump); enemies Owl/Cat/Ghost/Slime; mummies = background decor; full-screen edge-to-edge.
+  - Full rewrite: field 144x256, FRAME=0, no bezel, no rotate overlay, no on-screen controls. Jack = 16x24 caped mouse (4 poses: stand/run/jump/glide). 5 screens rebuilt (24 bombs y:86–230, 5 platforms each ~38px spacing, NIGHT=0). 5 backgrounds with vertical gradients + real palettes. Initials = 3-slot tap wheel (2x13 grid). Mummies decorative on GREEK/CASTLE.
+  - VERIFIED: 6/6 blocks node --check; smoke PASS (fit SC=2.708, 6000 ticks clean, maxMovers=1, 2 clears, all states render). Commit `16ce059` pushed to main.
+- **Playtest Round 1 (2026-08-29): COMPLETED, PUSHED `f8cb6ed`** — user feedback: "aspect ratio is off, pyramids badly drawn, jump too low, death sequence off (jack disappears), lit bombs all over the place + deadly, powerups spill out of play area, music absent".
   - Aspect: uniform letterbox (SC=fit + OX/OY centering), render translate fixed, pointer zones remapped through toLogical() so L/R zones track the playfield.
   - Pyramid bg: two-face shaded pyramids + sun + sphinx silhouette (replaced flat triangles).
   - Jump: JUMP_V 3.15→3.6, GRAV 0.16→0.15, JUMP_HOLD 0.045→0.055 (reaches upper platforms).
@@ -28,12 +32,11 @@ Last updated: PLAYTEST ROUND 1 FIXES APPLIED (in progress — smoke/push pending
 - **BSOD (5 crashes 8/25–8/28, all identical)**: bugcheck 0x113 = NVIDIA RTX 3090 TDR. Mitigations: 280W limit, lean context, small writes, subagents. Minidumps: C:\WINDOWS\Minidump\082826-*.dmp.
 
 ## Next actions (in order)
-1. Finish round-1 verification: node --check all blocks + headless smoke + git commit/push.
-2. **USER PLAYTEST ROUND 2** (fidelity loop, PLAN.md §5): user plays 2 min → what feels off? Iterate.
-3. GitHub Pages: repo has never returned 2xx from API (404s for 40+ min) — user must do the manual step: GitHub → horaboral/bombjack-miniapp → Settings → Pages → Deploy from a branch → main / (root) → Save. Then verify https://horaboral.github.io/bombjack-miniapp/.
-4. Phase 8: wire to Telegram bot 8699678610 (menuButton / webhook or long-poll) so the mini-app is reachable in Telegram.
-5. Phase 9: polish + final push.
-6. Repo hygiene: `refs/watch.html` (1.1MB YouTube HTML), `throughput.py`, `trunc-test/` are untracked leftovers — `refs/` must NOT be in the public repo; confirm .gitignore covers them or delete.
+1. **USER PLAYTEST ROUND 3** (vertical, on Telegram) — visual + feel judgment.
+2. GitHub Pages: user manual step — Settings → Pages → Deploy from branch → main / (root) → Save → verify https://horaboral.github.io/bombjack-miniapp/.
+3. Phase 8: wire to Telegram bot 8699678610 (menuButton / webhook or long-poll).
+4. Phase 9: polish + final push.
+5. Repo hygiene: confirm .gitignore covers refs/, research/, HANDOFF.
 
 ## Facts already learned (do NOT re-research)
 - Target = Tehkan 1984 ARCADE Bomb Jack (platformer). NOT Taito B-52. NOT NES Mighty Bomb Jack.
