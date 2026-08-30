@@ -1,8 +1,14 @@
 # Bomb Jack Mini-App — PROGRESS (read this FIRST in any new session)
 
-Last updated: PLAYTEST ROUND 2 VERTICAL REWORK DONE + PUSHED (`16ce059`). GitHub Pages still 404 (manual Settings→Pages step likely needed). Reasoning OFF applied to qwen38 (settings.yaml).
+Last updated: PLAYTEST ROUND 3 FIXES DONE + PUSHED (tap-jump, real photo backgrounds, 5-theme chiptune from real audio, Telegram swipe blocking, no PLAY button). GitHub Pages still 404 (manual Settings→Pages step needed).
 
 ## State
+- **Playtest Round 3 (2026-08-30): FIXES APPLIED, PUSHED** — user feedback: jump only on finger-up (mid-flight touch = steer), music redo (analyze the video), backgrounds "extremely sketchy" (use real photos), Telegram interprets steering as page-slide/minimize, PLAY button does nothing → remove.
+  - Jump: fires on finger-UP only (tap = jump; drag = steer, incl. mid-flight). Removed jumpHeld physics (glide = drag up, fast-fall = drag down).
+  - Music: subagent extracted real audio from YouTube TKzYmjnNbcA (yt-dlp + ffmpeg), Goertzel spectral analysis → 5 per-screen themes (32-step melody + 16-step bass + percussion, BPM 150/150/120/156/90), AY-3-8910-style (square lead, square bass, noise perc). PYRAMID theme built from measured B5/C#6-over-A1 content. Spec: refs/music_spec.md.
+  - Backgrounds: 5 real Unsplash photos → ffmpeg center-crop to 9:16 → 300x533 JPEG → base64 data URIs in SCREENS.bg. drawBG = photo + 22% dark overlay + ground strip + platforms + mummy decor (GREEK/CASTLE). Gradient fallback while loading.
+  - Telegram: W.disableVerticalSwipes() + non-passive touchmove preventDefault + gesturestart block. PLAY MainButton removed — game starts on tap.
+  - VERIFIED: 6/6 blocks clean; smoke PASS (fit SC=2.708, 24 bombs collected, maxMovers=1, round-clear fires). HTML ~188KB.
 - **Playtest Round 2 (2026-08-29): VERTICAL REWORK, PUSHED** — user feedback: aspect still wrong (game is VERTICAL), no rotate prompt, backgrounds need real-world palettes, sprites too sketchy (cute+detail, higher res), platform 2 unreachable screen 2, initials need tap wheel (no keyboard), controls invisible, fingerprint on left control, game fills phone screen, Jack = MOUSE (caped cute mouse), mummies should be mummies, enemies → assign species + cute.
   - Confirmed decisions: tall 9:16 field 144x256 full portrait screen; single-finger (drag anywhere = steer, tap = jump); enemies Owl/Cat/Ghost/Slime; mummies = background decor; full-screen edge-to-edge.
   - Full rewrite: field 144x256, FRAME=0, no bezel, no rotate overlay, no on-screen controls. Jack = 16x24 caped mouse (4 poses: stand/run/jump/glide). 5 screens rebuilt (24 bombs y:86–230, 5 platforms each ~38px spacing, NIGHT=0). 5 backgrounds with vertical gradients + real palettes. Initials = 3-slot tap wheel (2x13 grid). Mummies decorative on GREEK/CASTLE.
@@ -32,7 +38,7 @@ Last updated: PLAYTEST ROUND 2 VERTICAL REWORK DONE + PUSHED (`16ce059`). GitHub
 - **BSOD (5 crashes 8/25–8/28, all identical)**: bugcheck 0x113 = NVIDIA RTX 3090 TDR. Mitigations: 280W limit, lean context, small writes, subagents. Minidumps: C:\WINDOWS\Minidump\082826-*.dmp.
 
 ## Next actions (in order)
-1. **USER PLAYTEST ROUND 3** (vertical, on Telegram) — visual + feel judgment.
+1. **USER PLAYTEST ROUND 4** (photo backgrounds + tap-jump + new music, on Telegram) — visual + feel + sound judgment.
 2. GitHub Pages: user manual step — Settings → Pages → Deploy from branch → main / (root) → Save → verify https://horaboral.github.io/bombjack-miniapp/.
 3. Phase 8: wire to Telegram bot 8699678610 (menuButton / webhook or long-poll).
 4. Phase 9: polish + final push.
