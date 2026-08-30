@@ -11,3 +11,6 @@ HANDOFF-bombjack.md
 smoke.js
 chunk*.js
 chunkcheck_*.js
+inject_bg.js
+inject_bg2.js
+push_test.js
