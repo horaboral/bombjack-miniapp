@@ -114,10 +114,12 @@ function toLogical(e) {
   return { x: (e.clientX - r.left - OX) / SC, y: (e.clientY - r.top - OY) / SC };
 }
 // ================= GAME STATE ==================================================
-const ST = { TITLE: 0, PLAY: 1, ROUNDCLEAR: 2, GAMEOVER: 3, INITIALS: 4 };
+const ST = { TITLE: 0, PLAY: 1, ROUNDCLEAR: 2, GAMEOVER: 3, INITIALS: 4, HISCORES: 5 };
 const G = {
   st: ST.TITLE, score: 0, hi: +(localStorage.getItem('bj_hi') || 0),
   initials: localStorage.getItem('bj_init') || 'AAA',
+  // top-10 hi-score table: [{s, n}]
+  hiscore: JSON.parse(localStorage.getItem('bj_hiscore') || '[]'),
   lives: CFG.LIVES, round: 1, screenIdx: 0, mult: 1,
   nextLifeAt: CFG.EXTRA_AT, freeze: 0, touchKill: 0,
   litCount: 0, litThisRound: 0, bombsGot: 0, litBonusNext: 10000,
@@ -126,12 +128,12 @@ const G = {
   plat: [], platTop: new Map(),
   keys: {}, jumpHeld: false, jumpQueued: 0, glide: false,
   steerX: 0, steerY: 0,
-  stick: null,
+  stick: null, stickT: 0,
   msg: '', msgT: 0, shake: 0,
   initSlot: 0, initFilled: false,
 };
 const P = { x: 70, y: CFG.GROUND_Y - CFG.PLAYER_H, vy: 0, vx: 0, face: 1,
-  grounded: true, jumping: false, glide: false, dead: false, invuln: 90, anim: 0 };
+  grounded: true, jumping: false, glide: false, dead: false, invuln: 90, anim: 0, lastUp: 0 };
 function rectHit(a, b) { return a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y; }
 function setScreen(idx) {
   const s = SCREENS[idx];
@@ -145,7 +147,7 @@ function setScreen(idx) {
   G.enemies = []; G.coins = []; G.powerups = []; G.pops = [];
   P.x = 70; P.y = CFG.GROUND_Y - CFG.PLAYER_H; P.vx = 0; P.vy = 0;
   P.grounded = true; P.dead = false; P.jumping = false; P.glide = false; P.invuln = 60; P.face = 1;
-  G.steerX = 0; G.steerY = 0; G.jumpHeld = false; G.jumpQueued = 0; G.glide = false;
+  G.steerX = 0; G.steerY = 0; G.jumpHeld = false; G.jumpQueued = 0; G.jumpQueueT = 0; G.glide = false;
   G.initSlot = 0; G.initFilled = false;
 }
 function addPop(x, y, txt, col) { G.pops.push({ x, y, txt, col: col || '#fff', t: 45 }); }
@@ -173,6 +175,7 @@ cv.addEventListener('pointerdown', e => {
   const st = G.st;
   if (st === ST.TITLE) { G.jumpQueued++; return; }
   if (st === ST.GAMEOVER) { G.jumpQueued++; return; }
+  if (st === ST.HISCORES) { G.jumpQueued++; return; }
   if (st === ST.INITIALS) { handleInitialsTap(e); return; }
   if (zoneOf(e) === 'L') {
     // steering: ignore if a steer pointer is already active
@@ -220,8 +223,9 @@ window.addEventListener('keyup', e => {
 });
 function sampleInput() {
   let sx = 0, sy = 0;
+  G.stickT = Math.max(0, G.stickT - 1);
   if (G.stick) {
-    G.stick.t++;
+    G.stick.t++; G.stickT = 0;
     const d = G.stick.dx;
     sx = Math.abs(d) < CFG.DEAD_PX ? 0 : Math.max(-1, Math.min(1, (d - Math.sign(d) * CFG.DEAD_PX) / (CFG.FULL_PX - CFG.DEAD_PX)));
     const v = G.stick.dy;
@@ -245,15 +249,23 @@ function playerStep() {
     if (P.grounded) {
       P.vy = -CFG.JUMP_V; P.grounded = false; P.jumping = true; P.glide = false;
       addScore(10);
-    } else if (P.vy > -1.2) { P.glide = true; }
+    } else if (P.vy > -1.2) {
+      // mid-air tap = re-jump (the 1984 game lets you chain jumps while rising)
+      if (P.vy > -CFG.JUMP_V * 0.7) P.vy = -CFG.JUMP_V * 0.85;
+      P.glide = true;
+    }
   }
   if (!P.grounded) {
     P.vy += CFG.GRAV;
     if (P.vy > 0 && (P.glide || IN.sy < -0.3)) P.vy = Math.min(P.vy, CFG.GLIDE_V);
     if (P.vy > 0 && IN.sy > 0.5) P.vy += CFG.FAST_FALL;
     if (P.vy > 5) P.vy = 5;
-    // hold up while airborne = keep rising (unlimited, to the top of the screen)
-    if (IN.sy < -0.3) P.vy = Math.max(P.vy - CFG.JUMP_RISE, -CFG.JUMP_MAX_UP);
+    // hold up while airborne = keep rising (unlimited, to the top of the screen);
+    // ~10-tick grace after leaving the up-zone so wobbles don't kill the rise
+    const rising = IN.sy < -0.3 || G.stickT > 0;
+    if (rising) P.vy = Math.max(P.vy - CFG.JUMP_RISE, -CFG.JUMP_MAX_UP);
+    if (IN.sy < -0.3) G.stickT = 10;
+    else if (IN.sy > 0.3) G.stickT = 0;
   }
   P.x += P.vx;
   if (P.x < 2) { P.x = 2; P.vx = 0; }
@@ -1003,11 +1015,21 @@ function drawWorld() {
   drawHUD();
 }
 // ================= INITIALS (tap wheel) ========================================
+function saveHiScore() {
+  // insert this run into the top-10 table, newest first
+  const t = G.hiscore.slice();
+  t.push({ s: G.score, n: G.initials || 'AAA' });
+  t.sort((a, b) => b.s - a.s);
+  G.hiscore = t.slice(0, 10);
+  localStorage.setItem('bj_hiscore', JSON.stringify(G.hiscore));
+  G.hi = G.hiscore[0] ? G.hiscore[0].s : G.hi;
+  localStorage.setItem('bj_hi', G.hi);
+}
 const INIT_LETTERS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
-const INIT_COLS = 13, INIT_ROWS = 2;
+const INIT_COLS = 13, INIT_ROWS = 2; // A-M / N-Z (13+13=26)
 function initGrid() {
-  // returns { x0, y0, cw, ch } in logical px
-  return { x0: (CFG.W - INIT_COLS * 10) / 2, y0: 150, cw: 10, ch: 10 };
+  // returns { x0, y0, cw, ch } in logical px — 11px cells for fingers
+  return { x0: (CFG.W - INIT_COLS * 11) / 2, y0: 145, cw: 11, ch: 12 };
 }
 function handleInitialsTap(e) {
   const l = toLogical(e);
@@ -1027,7 +1049,8 @@ function handleInitialsTap(e) {
       }
     }
   } else if (G.initFilled && l.y > gr.y0 + INIT_ROWS * gr.ch + 30) {
-    G.st = ST.GAMEOVER;
+    saveHiScore();
+    G.st = ST.HISCORES;
   }
 }
 // ================= PANELS ======================================================
@@ -1276,6 +1299,8 @@ function tick() {
     if (G.jumpQueued > 0) { G.jumpQueued = 0; G.st = ST.TITLE; }
   } else if (G.st === ST.INITIALS) {
     // handled by tap in handleInitialsTap
+  } else if (G.st === ST.HISCORES) {
+    if (G.jumpQueued > 0) { G.jumpQueued = 0; G.st = ST.TITLE; }
   }
 }
 function drawTitleScreen() {
@@ -1383,7 +1408,7 @@ function render() {
       cx.strokeStyle = i === G.initSlot ? '#f0f040' : '#555'; cx.lineWidth = 1;
       cx.strokeRect(sx + 0.5, 105.5, 15, 17);
       cx.font = 'bold 12px monospace'; cx.fillStyle = '#fff';
-      cx.fillText(G.initials[i], sx + 5, 119);
+      cx.fillText(G.initials[i] || '', sx + 5, 119);
     }
     // letter grid
     const gr = initGrid();
@@ -1400,6 +1425,30 @@ function render() {
       const blink = Math.floor(performance.now() / 500) % 2;
       if (blink) { cx.font = 'bold 9px monospace'; cx.fillStyle = '#f0f040';
         cx.fillText('TAP TO CONTINUE', (CFG.W - cx.measureText('TAP TO CONTINUE').width) / 2, 230); }
+    }
+    cx.restore();
+    return;
+  }
+  if (G.st === ST.HISCORES) {
+    cx.fillStyle = '#000010'; cx.fillRect(0, 0, CFG.W, CFG.H);
+    cx.font = 'bold 14px monospace'; cx.fillStyle = '#f03030';
+    cx.fillText('HI-SCORES', (CFG.W - cx.measureText('HI-SCORES').width) / 2, 40);
+    if (G.hiscore.length === 0) {
+      cx.font = 'bold 9px monospace'; cx.fillStyle = '#888';
+      cx.fillText('NO SCORES YET', (CFG.W - cx.measureText('NO SCORES YET').width) / 2, 90);
+    }
+    cx.font = 'bold 10px monospace';
+    for (let i = 0; i < G.hiscore.length; i++) {
+      const e = G.hiscore[i];
+      const y = 70 + i * 16;
+      const rank = String(i + 1).padStart(2, '0');
+      const line = rank + '  ' + String(e.s).padStart(6, '0') + '  ' + e.n;
+      cx.fillStyle = i === 0 ? '#f0f040' : (i < 3 ? '#f0a040' : '#ccc');
+      cx.fillText(line, (CFG.W - cx.measureText(line).width) / 2, y);
+    }
+    if (Math.floor(performance.now() / 500) % 2) {
+      cx.font = 'bold 9px monospace'; cx.fillStyle = '#f0f040';
+      cx.fillText('TAP TO CONTINUE', (CFG.W - cx.measureText('TAP TO CONTINUE').width) / 2, 240);
     }
     cx.restore();
     return;
