@@ -1,5 +1,9 @@
 research/
 refs/
+.memory/
+llama-780m/
+llama-vulkan-windows/
+780m-helper-plan.md
 .creds.json
 .git-identity
 *.log
