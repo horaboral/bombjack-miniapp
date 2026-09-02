@@ -8,6 +8,8 @@ llama-vulkan-windows/
 .git-identity
 *.log
 node_modules/
+# palace stays local (private memory; lessons.md content mirrored in docs/telegram-game-lessons.md)
+.memory/
 # local diagnostics / session artifacts (do not ship in public repo)
 throughput.py
 trunc-test/
