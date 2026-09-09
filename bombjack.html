@@ -133,7 +133,7 @@ const G = {
   initSlot: 0, initFilled: false,
   // Title-screen real-face bouncers (cockroach + gorilla)
   roachFrames: [], gorillaFrames: [], faceFrame: 0, faceClock: 0,
-  bouncer: null, // {x, y, vx, vy}
+  bouncers: null, // [{x, y, dir, speed}, ...] roach + gorilla
 };
 const P = { x: 70, y: CFG.GROUND_Y - CFG.PLAYER_H, vy: 0, vx: 0, face: 1,
   grounded: true, jumping: false, glide: false, dead: false, invuln: 90, anim: 0, lastUp: 0 };
@@ -920,14 +920,10 @@ function loadFaceFrames() {
     const gl = new Image(); gl.onload = () => { G.gorillaFrames.push(gl); };
     gl.src = 'assets/final_small/gorilla/f_' + pad + '.png';
   }
-  // Bouncer state: spawns at ~1/8 of screen height, moves at 45deg diagonals
-  const h = 32; // ~1/8 of 256
-  G.bouncer = {
-    x: 20 + Math.random() * (CFG.W - 60),
-    y: h,
-    dir: Math.floor(Math.random() * 4), // 0:+45 1:+135 2:-45 3:-135 (screen coords)
-    speed: 1.2,
-  };
+  // Two bouncers: cockroach (left face) + gorilla (right face).
+  // Random non-overlapping start positions, not touching borders,
+  // random 45deg diagonal direction each.
+  G.bouncers = spawnBouncers();
 }
 const BOUNCE_DIRS = [
   { dx: 1, dy: 1 },  // down-right (45 deg)
@@ -935,19 +931,51 @@ const BOUNCE_DIRS = [
   { dx: 1, dy: -1 }, // up-right (-45 deg)
   { dx: -1, dy: -1 } // up-left (-135 deg)
 ];
+const BOUNCE_W = [24, 28]; // draw widths: roach 24, gorilla 28
+const BOUNCE_H = [49, 21]; // draw heights: roach 49 (71:147), gorilla 21 (72:55)
+function spawnBouncers() {
+  const m = 20; // border margin (half of widest sprite + slack)
+  const top = 32; // ~1/8 of screen height
+  const out = [];
+  for (let i = 0; i < 2; i++) {
+    let x, y, tries = 0;
+    do {
+      x = m + Math.random() * (CFG.W - 2 * m);
+      y = top + Math.random() * (CFG.H - 2 * top - 40);
+      tries++;
+    } while (tries < 50 && out.some(o => Math.abs(o.x - x) < 40 && Math.abs(o.y - y) < 60));
+    out.push({
+      x: x, y: y,
+      dir: Math.floor(Math.random() * 4),
+      speed: 1.2,
+    });
+  }
+  return out;
+}
 function bouncerStep() {
-  const b = G.bouncer;
-  if (!b) return;
-  const d = BOUNCE_DIRS[b.dir];
-  b.x += d.dx * b.speed;
-  b.y += d.dy * b.speed;
-  const m = 16; // margin
-  // Border rebound: flip the axis component that hit the wall.
-  // dir bits: bit0 = dx sign (0:+1, 1:-1), bit1 = dy sign (0:+1, 1:-1)
-  if (b.x < m) { b.x = m; b.dir = (b.dir & 2) | 0; }           // left wall -> dx=+1
-  else if (b.x > CFG.W - m) { b.x = CFG.W - m; b.dir = (b.dir & 2) | 1; } // right wall -> dx=-1
-  if (b.y < m) { b.y = m; b.dir = (b.dir & 1) | 2; }           // top -> dy=-1
-  else if (b.y > CFG.H - m) { b.y = CFG.H - m; b.dir = (b.dir & 1) | 0; } // bottom -> dy=+1
+  const bs = G.bouncers;
+  if (!bs) return;
+  for (const b of bs) {
+    const d = BOUNCE_DIRS[b.dir];
+    b.x += d.dx * b.speed;
+    b.y += d.dy * b.speed;
+    const m = 16; // margin
+    // Border rebound: mirror the axis that hit the wall.
+    // dir bits: bit0 = dx sign (0:+1, 1:-1), bit1 = dy sign (0:+1, 1:-1)
+    if (b.x < m) { b.x = m; b.dir = (b.dir & 2) | 0; }           // left wall -> dx=+1
+    else if (b.x > CFG.W - m) { b.x = CFG.W - m; b.dir = (b.dir & 2) | 1; } // right wall -> dx=-1
+    if (b.y < m) { b.y = m; b.dir = (b.dir & 1) | 0; }           // top -> dy=+1 (bounce down)
+    else if (b.y > CFG.H - m) { b.y = CFG.H - m; b.dir = (b.dir & 1) | 2; } // bottom -> dy=-1 (bounce up)
+  }
+  // Mutual collision: both reverse 180 degrees (flip dx AND dy).
+  const [a, b] = bs;
+  if (Math.abs(a.x - b.x) < (BOUNCE_W[0] + BOUNCE_W[1]) / 2 &&
+      Math.abs(a.y - b.y) < (BOUNCE_H[0] + BOUNCE_H[1]) / 2) {
+    a.dir ^= 3; b.dir ^= 3; // flip both axis bits
+    // Separate them so they don't re-collide next frame
+    const push = a.x < b.x ? -3 : 3;
+    a.x += push; b.x -= push;
+  }
 }
 function drawBG(s, t) {
   const g = cx;
@@ -1410,15 +1438,18 @@ function drawTitleScreen() {
   g.font = 'bold 7px monospace'; g.fillStyle = '#e0d0a0';
   g.fillText('HI-SCORE ' + String(G.hi).padStart(6, '0') + (G.initials ? ' ' + G.initials : ''), W / 2, 244);
   g.textAlign = 'left';
-  // --- real-face bouncer (cockroach or gorilla, animated at 10fps) ---
-  const b = G.bouncer;
-  const rf = G.roachFrames[G.faceFrame], gf = G.gorillaFrames[G.faceFrame];
-  // alternate which character bounces (or draw both? spec says one bouncer)
-  // draw the cockroach (left face) as the bouncer
-  if (b && rf && rf.complete) {
-    const bw = 24, bh = 49; // keep 358:734 aspect
+  // --- real-face bouncers (roach + gorilla, animated at 10fps) ---
+  if (G.bouncers) {
+    const rf = G.roachFrames[G.faceFrame], gf = G.gorillaFrames[G.faceFrame];
     g.imageSmoothingEnabled = false;
-    g.drawImage(rf, Math.round(b.x - bw / 2), Math.round(b.y - bh / 2), bw, bh);
+    for (let i = 0; i < G.bouncers.length; i++) {
+      const b = G.bouncers[i];
+      const img = i === 0 ? rf : gf;
+      if (img && img.complete) {
+        const bw = BOUNCE_W[i], bh = BOUNCE_H[i];
+        g.drawImage(img, Math.round(b.x - bw / 2), Math.round(b.y - bh / 2), bw, bh);
+      }
+    }
     g.imageSmoothingEnabled = true;
   }
 }
