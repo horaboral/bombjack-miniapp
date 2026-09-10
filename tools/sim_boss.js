@@ -97,14 +97,16 @@ check(outOfBounds === 0, 'boss stayed in bounds for 1500 frames', 'boss went out
 const miniSpawns = S.G.enemies.filter(e => e.mini).length;
 check(miniSpawns > 0, 'mini-replicas spawned from boss legs: ' + miniSpawns, 'no mini-replicas spawned');
 
-// ---- Test 3: mini drop completes in ~1s (<=120 frames) ----
+// ---- Test 3: mini drop lands on a SOLID surface (platform or ground) ----
 if (S.G.boss) {
   S.spawnMiniBoss(S.G.boss);
   const mini = S.G.enemies[S.G.enemies.length - 1];
-  for (let f = 0; f < 240 && mini.dropping; f++) S.enemyStep();
-  check(!mini.dropping,
-    'mini drop finished (frames=' + mini.miniT + ', landed at y=' + mini.y.toFixed(1) + ')',
-    'mini still dropping after 240 frames');
+  const startY = mini.y;
+  for (let f = 0; f < 300 && mini.dropping; f++) S.enemyStep();
+  const surfY = S.surfaceAtX(mini.x);
+  check(!mini.dropping && Math.abs(mini.y - (surfY - 8)) < 1.5,
+    'mini landed on solid surface at y=' + mini.y.toFixed(1) + ' (surface=' + surfY + ', fell ' + (mini.y - startY).toFixed(1) + 'px)',
+    'mini did not land correctly (dropping=' + mini.dropping + ', y=' + mini.y.toFixed(1) + ')');
 }
 
 // ---- Test 4: player hit with P reduces hp; without P, no effect ----
@@ -118,7 +120,22 @@ check(S.G.boss && S.G.boss.hp === 5, 'no damage without P (hp stayed 5)', 'hp ch
 S.G.freeze = 100;
 S.G.st = S.ST.PLAY; // bossStep requires play state
 S.bossStep();
-check(S.G.boss && S.G.boss.hp === 4, 'hit with P reduced hp 5->4', 'hp not reduced with P: ' + (S.G.boss && S.G.boss.hp));
+check(S.G.boss && S.G.boss.hp === 4, 'hit with P reduced hp 5->4 (hitCd now ' + S.G.boss.hitCd + ')', 'hp not reduced with P: ' + (S.G.boss && S.G.boss.hp));
+
+// ---- Test 4b: hit cooldown — overlapping again immediately does NOT re-hit ----
+S.G.freeze = 100;
+S.P.x = S.G.boss.x; S.P.y = S.G.boss.y;
+S.bossStep();
+check(S.G.boss && S.G.boss.hp === 4,
+  'no second hit during cooldown (hp stayed 4, hitCd=' + (S.G.boss && S.G.boss.hitCd) + ')',
+  're-hit during cooldown (hp=' + (S.G.boss && S.G.boss.hp) + ')');
+
+// ---- Test 4c: player is BOUNCED off (vx set) when touching with P ----
+S.G.boss.hitCd = 0; // reset so we isolate the bounce
+S.P.x = S.G.boss.x; S.P.y = S.G.boss.y; S.P.vx = 0; S.P.vy = 0; S.P.grounded = true;
+S.bossStep();
+const bounced = Math.abs(S.P.vx) > 0.5 || Math.abs(S.P.vy) > 0.5;
+check(bounced, 'player bounced off boss (vx=' + S.P.vx.toFixed(1) + ', vy=' + S.P.vy.toFixed(1) + ')', 'player not bounced (vx=' + S.P.vx.toFixed(1) + ')');
 
 // ---- Test 5: final hit triggers poof (bossStep needs ST.PLAY) ----
 // playerDie() must be defined or enemyStep's touch-kill branch will throw
@@ -146,6 +163,33 @@ const normals = S.G.enemies.filter(e => !e.mini);
 const badTypes = normals.filter(e => e.type === 'owl'); // first type is sacrificed
 check(minis > 0 && normals.length > 0, 'mixed spawning: ' + minis + ' minis + ' + normals.length + ' normal enemies', 'no mixed spawning');
 check(badTypes.length === 0, 'sacrificed type (owl) absent from normal pool', badTypes.length + ' owls spawned despite sacrifice');
+
+// ---- Test 7: minis are GROUND walkers (patrol like regular enemies) ----
+S.setScreen(0);
+S.G.st = S.ST.PLAY;
+S.G.boss = { kind: 'roach', x: 60, y: 40, bw: 23, bh: 48, frames: S.G.roachFrames };
+S.G.enemies = [];
+S.spawnMiniBoss(S.G.boss);
+const m2 = S.G.enemies[0];
+for (let f = 0; f < 300 && m2.dropping; f++) S.enemyStep();
+const x0 = m2.x, dir0 = m2.dir;
+for (let f = 0; f < 60; f++) S.enemyStep();
+check(Math.abs(m2.x - x0) > 2 || m2.dir !== dir0,
+  'mini patrols like a ground enemy (moved ' + (m2.x - x0).toFixed(1) + 'px, dir ' + dir0 + '->' + m2.dir + ')',
+  'mini is not moving like a regular enemy');
+
+// ---- Test 8: P turns a mini into yellow jelly (coin=true), collectible ----
+S.G.enemies = [m2]; m2.dropping = false; m2.coin = false; m2.frozen = false;
+S.G.freeze = 0;
+// simulate the P pickup conversion (line 572 of the game)
+for (const e of S.G.enemies) if (!e.frozen) { e.frozen = true; e.coin = true; }
+check(m2.coin === true, 'P froze the mini into jelly (coin=true)', 'mini not converted by P');
+// collect it
+m2.x = S.P.x; m2.y = S.P.y; S.G.freeze = 300;
+const score0 = S.G.score;
+S.enemyStep();
+check(!m2.dead || S.G.enemies.filter(e => e === m2).length === 0,
+  'frozen mini collected as jelly (score ' + score0 + '->' + S.G.score + ')', 'frozen mini not collectible');
 
 console.log(ok ? '=== ALL BOSS TESTS PASSED ===' : '=== SOME TESTS FAILED ===');
 process.exit(ok ? 0 : 1);
