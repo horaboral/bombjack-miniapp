@@ -59,6 +59,8 @@ const CFG = {
   JUMP_RISE: 0.34,         // extra upward accel while steering up (hold = rise to top)
   JUMP_MAX_UP: 3.4,        // terminal rise speed while holding
   JUMP_CUT: 0.42,          // vy multiplier on early release
+  RISE_MIN_A: 50 * Math.PI / 180,   // min steer angle (from horizontal) that keeps the rise
+  RISE_MAX_A: 130 * Math.PI / 180,  // max steer angle that keeps the rise
   GLIDE_V: 0.7,           // fall speed while gliding
   FAST_FALL: 0.8,          // extra fall accel steering down
   DEAD_PX: 12, FULL_PX: 40,
@@ -254,7 +256,10 @@ function bossStep() {
   if (!b) return;
   if (b.poofT > 0) { b.poofT--; if (b.poofT <= 0) G.boss = null; return; }
   if (G.st !== ST.PLAY) return;
-  if (G.freeze > 0 && b.flashT > 0) b.flashT--;
+  if (b.flashT > 0) b.flashT--;
+  // invincible unless the player currently has a P (freeze) active — no
+  // damage or bounce while freeze has ended
+  const vulnerable = G.freeze > 0;
   // bounce movement like the title screen (45deg diagonal, wall + platform rebound)
   const dx = (b.dir & 1) ? -b.speed : b.speed;
   const dy = (b.dir & 2) ? -b.speed : b.speed;
@@ -285,7 +290,7 @@ function bossStep() {
   // player hit: only counts while holding P (freeze). The boss BOUNCES the
   // player off in the opposite direction, and each hit has a cooldown so a
   // single pass can't rack up many hits — it should be hard to kill.
-  if (!P.dead && P.invuln <= 0 && G.freeze > 0 &&
+  if (!P.dead && P.invuln <= 0 && vulnerable &&
       rectHit({ x: P.x, y: P.y, w: CFG.PLAYER_W, h: CFG.PLAYER_H }, bossBox(b))) {
     if (b.hitCd === 0) {
       b.hp--; b.flashT = 12; b.hitCd = 45;
@@ -466,15 +471,26 @@ function playerStep() {
   }
   if (!P.grounded) {
     P.vy += CFG.GRAV;
-    if (P.vy > 0 && (P.glide || IN.sy < -0.3)) P.vy = Math.min(P.vy, CFG.GLIDE_V);
+    // RISE ZONE: the hero keeps rising only while the steer direction
+    // points upward within 50..130 deg from horizontal (majorly up).
+    // Outside that band (or thumb released) the rise ends; steering up then
+    // only fights gravity (slower fall / glide), it does NOT lift.
+    const mag = Math.hypot(IN.sx, IN.sy);
+    let rising = false;
+    if (mag > 0.05 && IN.sy < 0) {
+      const ang = Math.atan2(-IN.sy, IN.sx); // 0=right, PI/2=straight up, PI=left
+      rising = (ang >= CFG.RISE_MIN_A && ang <= CFG.RISE_MAX_A);
+    }
+    if (rising || G.stickT > 0) {
+      P.vy = Math.max(P.vy - CFG.JUMP_RISE, -CFG.JUMP_MAX_UP);
+      G.stickT = 10; // ~10-tick grace after leaving the up-zone
+    } else {
+      G.stickT = 0;
+      // steering up (any up component) = glide: fall slower, but no lift
+      if (P.vy > 0 && IN.sy < -0.3) P.vy = Math.min(P.vy, CFG.GLIDE_V);
+    }
     if (P.vy > 0 && IN.sy > 0.5) P.vy += CFG.FAST_FALL;
     if (P.vy > 5) P.vy = 5;
-    // hold up while airborne = keep rising (unlimited, to the top of the screen);
-    // ~10-tick grace after leaving the up-zone so wobbles don't kill the rise
-    const rising = IN.sy < -0.3 || G.stickT > 0;
-    if (rising) P.vy = Math.max(P.vy - CFG.JUMP_RISE, -CFG.JUMP_MAX_UP);
-    if (IN.sy < -0.3) G.stickT = 10;
-    else if (IN.sy > 0.3) G.stickT = 0;
   }
   P.x += P.vx;
   if (P.x < 2) { P.x = 2; P.vx = 0; }
@@ -655,6 +671,87 @@ function spawnEnemy(forceType) {
 function enemyBox(e) {
   return { x: e.x - 7, y: e.y - 7, w: 14, h: 14 };
 }
+// Shared walking rules for every ground enemy (incl. mini-replicas):
+//  - walks its surface; at a TIP (edge), 50% turn back, 50% walk off and fall
+//  - roughly every 10s an eligible enemy jumps to a higher platform if one
+//    exists with a walkable spot; picks a 50/50 left/right landing direction
+//  - flying types (owl/ghost) still bob; they walk the same edge/jump rules
+function higherPlatformFor(e) {
+  // find a platform ABOVE e's current surface with a walkable area for e
+  const curTop = e.surf === 'ground' ? CFG.GROUND_Y : e.baseY + 17;
+  let best = null;
+  for (const pl of G.plat) {
+    if (pl.y + 17 >= curTop - 2) continue;      // must be higher (smaller y)
+    if (pl.w < 22) continue;                    // needs room to walk
+    if (best && pl.y > best.y) continue;        // prefer the lowest higher one
+    best = pl;
+  }
+  return best;
+}
+function stepEnemyWalk(e) {
+  // periodic jump to a higher platform (~every 10s, eligible = has a higher one)
+  e.jumpCd = (e.jumpCd == null ? 600 : e.jumpCd - 1);
+  if (e.jumpCd <= 0) {
+    const hp = higherPlatformFor(e);
+    if (hp) {
+      // land on the higher platform, pick 50/50 left-right direction
+      e.surf = 'plat';
+      const cx = hp.x + hp.w / 2;
+      e.x = Math.max(hp.x + 6, Math.min(hp.x + hp.w - 6, cx + (Math.random() < 0.5 ? -1 : 1) * (hp.w * 0.25)));
+      e.minX = hp.x + 6; e.maxX = hp.x + hp.w - 6;
+      e.baseY = hp.y - 17;
+      e.y = e.baseY;
+      e.dir = e.x < cx ? 1 : -1; // walk away from the middle, 50/50 side
+      e.jumpCd = 600;
+      return;
+    }
+    e.jumpCd = 600; // no higher platform; retry in ~10s
+  }
+  const isFly = (e.type === 'owl' || e.type === 'ghost' || e.type === 'roach' || e.type === 'gorilla');
+  const hop = e.type === 'cat' ? 2 : 0;
+  // horizontal walk with a little type flavor
+  let sp = e.speed;
+  if (e.type === 'cat') sp *= 0.9;
+  else if (e.type === 'slime') sp *= 0.7;
+  else if (e.type === 'owl') sp *= 0.55;
+  else if (e.type === 'ghost') sp *= 0.45;
+  else sp *= 0.8; // mini / generic ground
+  e.x += e.dir * sp;
+  // EDGE behavior: 50% turn back at the tip, 50% walk off (fall)
+  if (e.x <= e.minX && e.dir < 0) {
+    if (Math.random() < 0.5) { e.x = e.minX; e.dir = 1; }
+    else { e.x = e.minX - 1; } // step off the tip
+  } else if (e.x >= e.maxX && e.dir > 0) {
+    if (Math.random() < 0.5) { e.x = e.maxX; e.dir = -1; }
+    else { e.x = e.maxX + 1; } // step off the tip
+  }
+  // vertical: sit on surface, or fall when off the edge
+  const surfY = (e.surf === 'ground' ? CFG.GROUND_Y : e.baseY + 17);
+  const overEdge = (e.surf !== 'ground') &&
+    ((e.x < e.minX) || (e.x > e.maxX));
+  if (overEdge) {
+    // falling off a platform tip
+    e.vy = (e.vy == null ? 0 : e.vy) + 0.15;
+    e.y += e.vy;
+    // land on a lower surface or the ground
+    const landY = surfaceAtX(e.x) - (isFly ? 17 : 8);
+    if (e.y >= landY) {
+      e.y = landY;
+      e.vy = 0;
+      e.baseY = landY;
+      e.surf = (landY + (isFly ? 17 : 8) >= CFG.GROUND_Y - 1) ? 'ground' : e.surf;
+      if (e.surf === 'ground') { e.minX = 8; e.maxX = CFG.W - 8; }
+      else {
+        // find the platform under it to set bounds
+        let pl = null;
+        for (const p2 of G.plat) if (e.x > p2.x && e.x < p2.x + p2.w && Math.abs((e.baseY + (isFly ? 17 : 8)) - p2.y) < 2) { pl = p2; break; }
+        if (pl) { e.minX = pl.x + 6; e.maxX = pl.x + pl.w - 6; } else { e.surf = 'ground'; e.minX = 8; e.maxX = CFG.W - 8; e.baseY = CFG.GROUND_Y - (isFly ? 17 : 8); }
+      }
+    }
+  } else {
+    e.y = e.baseY + (isFly ? Math.sin(e.t * 0.08 + e.phase) * 3 : -Math.abs(Math.sin(e.t * 0.2)) * hop);
+  }
+}
 function enemyStep() {
   if (G.st === ST.PLAY && G.freeze <= 0) {
     G.spawnT--;
@@ -699,40 +796,11 @@ function enemyStep() {
       continue;
     }
     if (e.mini) {
-      // mini-replica patrols the surface it landed on, like a regular ground enemy
-      e.x += e.dir * e.speed;
-      if (e.x < e.minX) { e.x = e.minX; e.dir = 1; }
-      if (e.x > e.maxX) { e.x = e.maxX; e.dir = -1; }
-      e.y = e.baseY;
+      // mini-replica: same walking/jumping rules as regular ground enemies
+      stepEnemyWalk(e);
       continue;
     }
-    if (e.type === 'cat') {
-      // cute cat: trots along its surface, hops slightly
-      e.x += e.dir * e.speed * 0.9;
-      if (e.x < e.minX) { e.x = e.minX; e.dir = 1; }
-      if (e.x > e.maxX) { e.x = e.maxX; e.dir = -1; }
-      e.y = e.baseY - Math.abs(Math.sin(e.t * 0.2)) * 2;
-    } else if (e.type === 'slime') {
-      // squishy slime: bounces (parabolic) and patrols
-      if (e.y > (e.baseY - 0.5) - 0.01) e.vy = -1.8;
-      else e.vy += 0.12;
-      e.y += e.vy;
-      e.x += e.dir * e.speed * 0.7;
-      if (e.x < e.minX) { e.x = e.minX; e.dir = 1; }
-      if (e.x > e.maxX) { e.x = e.maxX; e.dir = -1; }
-    } else if (e.type === 'owl') {
-      // owl: hovers above its platform, flaps, patrols left-right
-      e.x += e.dir * e.speed * 0.55;
-      if (e.x < e.minX) { e.x = e.minX; e.dir = 1; }
-      if (e.x > e.maxX) { e.x = e.maxX; e.dir = -1; }
-      e.y = e.baseY + Math.sin(e.t * 0.09 + e.phase) * 2.5;
-    } else if (e.type === 'ghost') {
-      // ghost: bobs gently above its platform, drifts back and forth
-      e.x += e.dir * e.speed * 0.45;
-      if (e.x < e.minX) { e.x = e.minX; e.dir = 1; }
-      if (e.x > e.maxX) { e.x = e.maxX; e.dir = -1; }
-      e.y = e.baseY + Math.sin(e.t * 0.04 + e.phase) * 5;
-    }
+    stepEnemyWalk(e);
     // touch
     if (!P.dead && P.invuln <= 0 && !e.coin) {
       if (rectHit({ x: P.x + 1, y: P.y + 1, w: CFG.PLAYER_W - 2, h: CFG.PLAYER_H - 2 }, enemyBox(e))) {
@@ -748,7 +816,14 @@ function enemyStep() {
     }
   }
   G.enemies = G.enemies.filter(e => !e.dead);
-  if (G.freeze > 0) G.freeze--;
+  if (G.freeze > 0) {
+    G.freeze--;
+    if (G.freeze === 0) {
+      // P effect over: minis that survived the freeze get their bodies back
+      // (were turned to head-in-goo while frozen), normal enemies un-freeze
+      for (const e of G.enemies) { e.frozen = false; e.coin = false; }
+    }
+  }
   if (G.touchKill > 0) G.touchKill--;
 }
 </script>
@@ -1151,12 +1226,14 @@ function loadBGImages() {
 // ================= TITLE FACE FRAMES (real men -> cartoon bodies) ============
 const FACE_N = 53, FACE_FPS = 10;
 function loadFaceFrames() {
-  G.roachFrames = []; G.gorillaFrames = [];
+  // Indexed assignment (not push) so a slow/late load can't misalign the array:
+  // frame i always lands at [i], regardless of which PNGs finish first.
+  G.roachFrames = new Array(FACE_N); G.gorillaFrames = new Array(FACE_N);
   for (let i = 0; i < FACE_N; i++) {
     const rn = i + 1, pad = String(rn).padStart(3, '0');
-    const r = new Image(); r.onload = () => { G.roachFrames.push(r); };
+    const r = new Image(); r.onload = () => { G.roachFrames[i] = r; };
     r.src = 'assets/final_small/roach/f_' + pad + '.png';
-    const gl = new Image(); gl.onload = () => { G.gorillaFrames.push(gl); };
+    const gl = new Image(); gl.onload = () => { G.gorillaFrames[i] = gl; };
     gl.src = 'assets/final_small/gorilla/f_' + pad + '.png';
   }
   // Two bouncers: cockroach (left face) + gorilla (right face).
@@ -1323,12 +1400,13 @@ function drawWorld() {
       const img = (e.type === 'roach' ? G.roachFrames : G.gorillaFrames)[G.faceFrame];
       const mw = e.type === 'roach' ? 14 : 16, mh = e.type === 'roach' ? 28 : 24;
       if (e.coin) {
-        // P froze it: yellow jelly body with the laughing head left at the center
+        // P froze it: body removed — only the head, centered in the yellow goo
         g.fillStyle = 'rgba(240,192,32,0.85)';
-        g.beginPath(); g.ellipse(e.x, e.y, mw / 2 + 2, mh / 2 + 2, 0, 0, 7); g.fill();
+        g.beginPath(); g.ellipse(e.x, e.y, mw / 2 + 3, mw / 2 + 3, 0, 0, 7); g.fill();
         if (img && img.complete) {
           g.imageSmoothingEnabled = false;
-          g.drawImage(img, Math.round(e.x - mw * 0.3), Math.round(e.y - mh * 0.3), mw * 0.6, mh * 0.6);
+          const hw = e.type === 'roach' ? 10 : 11; // head only
+          g.drawImage(img, Math.round(e.x - hw / 2), Math.round(e.y - hw / 2), hw, hw);
           g.imageSmoothingEnabled = true;
         }
       } else if (img && img.complete) {
