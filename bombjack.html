@@ -937,6 +937,9 @@ function spawnBouncers() {
   const m = 20; // border margin (half of widest sprite + slack)
   const top = 32; // ~1/8 of screen height
   const out = [];
+  const d0 = Math.floor(Math.random() * 4);
+  let d1;
+  do { d1 = Math.floor(Math.random() * 4); } while (d1 === d0); // never same direction
   for (let i = 0; i < 2; i++) {
     let x, y, tries = 0;
     do {
@@ -946,7 +949,7 @@ function spawnBouncers() {
     } while (tries < 50 && out.some(o => Math.abs(o.x - x) < 40 && Math.abs(o.y - y) < 60));
     out.push({
       x: x, y: y,
-      dir: Math.floor(Math.random() * 4),
+      dir: i === 0 ? d0 : d1,
       speed: 1.2,
     });
   }
