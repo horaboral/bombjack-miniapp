@@ -938,8 +938,7 @@ function spawnBouncers() {
   const top = 32; // ~1/8 of screen height
   const out = [];
   const d0 = Math.floor(Math.random() * 4);
-  let d1;
-  do { d1 = Math.floor(Math.random() * 4); } while (d1 === d0); // never same direction
+  const d1 = d0 ^ 3; // opposite direction (flip both axis bits = 180 deg)
   for (let i = 0; i < 2; i++) {
     let x, y, tries = 0;
     do {
