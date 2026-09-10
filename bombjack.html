@@ -931,8 +931,8 @@ const BOUNCE_DIRS = [
   { dx: 1, dy: -1 }, // up-right (-45 deg)
   { dx: -1, dy: -1 } // up-left (-135 deg)
 ];
-const BOUNCE_W = [36, 40]; // draw widths: roach 36, gorilla 40
-const BOUNCE_H = [74, 49]; // draw heights: roach 74 (108:222), gorilla 49 (120:120, body 668:811)
+const BOUNCE_W = [36, 54]; // draw widths: roach 36, gorilla 54 (35% bigger)
+const BOUNCE_H = [74, 66]; // draw heights: roach 74, gorilla 66 (54:66, body proportions kept)
 function spawnBouncers() {
   const m = 20; // border margin (half of widest sprite + slack)
   const top = 32; // ~1/8 of screen height
