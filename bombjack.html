@@ -134,6 +134,9 @@ const G = {
   // Title-screen real-face bouncers (cockroach + gorilla)
   roachFrames: [], gorillaFrames: [], faceFrame: 0, faceClock: 0,
   bouncers: null, // [{x, y, dir, speed}, ...] roach + gorilla
+  // Boss: Jotito (roach, screen 0) / Sobesinho (gorilla, screen 1)
+  boss: null, // {kind,name,frames,x,y,dx,dy,hp,maxHp,spawnT,poofT,spawnCd}
+  bossPoofs: [], // {x, y, t}
 };
 const P = { x: 70, y: CFG.GROUND_Y - CFG.PLAYER_H, vy: 0, vx: 0, face: 1,
   grounded: true, jumping: false, glide: false, dead: false, invuln: 90, anim: 0, lastUp: 0 };
@@ -152,6 +155,8 @@ function setScreen(idx) {
   P.grounded = true; P.dead = false; P.jumping = false; P.glide = false; P.invuln = 60; P.face = 1;
   G.steerX = 0; G.steerY = 0; G.jumpHeld = false; G.jumpQueued = 0; G.jumpQueueT = 0; G.glide = false;
   G.initSlot = 0; G.initFilled = false;
+  G.bossPoofs = [];
+  spawnBoss();
 }
 function addPop(x, y, txt, col) { G.pops.push({ x, y, txt, col: col || '#fff', t: 45 }); }
 function newGame() {
@@ -162,6 +167,185 @@ function newGame() {
 function addScore(n) {
   G.score += n;
   while (G.score >= G.nextLifeAt) { G.nextLifeAt += CFG.EXTRA_AT; G.lives++; addPop(P.x, P.y - 8, '1UP', '#40ff40'); }
+}
+// ================= BOSS (Jotito / Sobesinho) ==================================
+// Screen 0 → Jotito (roach, 65% of title size), Screen 1 → Sobesinho (gorilla).
+// Boss bounces like the title screen, rebounds off walls AND all platforms,
+// is invincible UNLESS the player holds a P (freeze) powerup — then touching it
+// knocks 1/10 energy. 10 hits → cartoonish poof + funny sound.
+// Half the spawned enemies are mini-replicas of the boss, born "between its
+// legs" and dropping down (~1s) before detaching and patrolling normally.
+const BOSS_DEFS = [
+  { key: 0, kind: 'roach',   name: 'JOTITO',     hits: 10 },
+  { key: 1, kind: 'gorilla', name: 'SOBESINHO',  hits: 10 },
+];
+function bossFrames(kind) { return kind === 'roach' ? G.roachFrames : G.gorillaFrames; }
+function bossDrawSize(kind) {
+  // Title sizes: roach 36x74, gorilla 54x66. Jotito = 65% of title.
+  // Sobesinho = full title size.
+  if (kind === 'roach')   return [Math.round(36 * 0.65), Math.round(74 * 0.65)]; // 23x48
+  return [54, 66];
+}
+function topPlatformY() {
+  // highest platform top; if none, use a default upper band
+  if (G.plat.length === 0) return 60;
+  let minY = Infinity;
+  for (const pl of G.plat) if (pl.y < minY) minY = pl.y;
+  return minY;
+}
+function spawnBoss() {
+  const idx = G.screenIdx;
+  const def = BOSS_DEFS[idx];
+  if (!def) { G.boss = null; return; }
+  const frames = bossFrames(def.kind);
+  const [bw, bh] = bossDrawSize(def.kind);
+  // spawn in top area above highest platform, size <= 85% of that gap
+  const topY = topPlatformY();
+  const gap = topY - 18; // HUD top ~18
+  const maxH = gap * 0.85;
+  let dh = bh, dw = bw;
+  if (dh > maxH) { dh = maxH; dw = Math.round(dw * (dh / bh)); }
+  const x = dw / 2 + 6 + Math.random() * (CFG.W - dw - 12);
+  const y = 18 + Math.random() * Math.max(4, (gap - dh) * 0.6);
+  const dir = Math.floor(Math.random() * 4);
+  G.boss = {
+    kind: def.kind, name: def.name, frames: frames,
+    x, y, bw: dw, bh: dh,
+    dir, speed: 1.0,
+    hp: def.hits, maxHp: def.hits,
+    spawnCd: 90,        // frames until first mini-replica spawns
+    poofT: 0,           // >0 while playing death poof
+    flashT: 0,
+  };
+}
+function bossBox(b) { return { x: b.x - b.bw / 2, y: b.y - b.bh / 2, w: b.bw, h: b.bh }; }
+// mini-replica enemy born between the boss's legs, drops ~1s then detaches
+function spawnMiniBoss(b) {
+  if (G.enemies.length >= 7) return;
+  const type = b.kind; // 'roach' | 'gorilla'
+  const e = {
+    type, t: 0, dir: Math.random() < 0.5 ? 1 : -1,
+    frozen: false, coin: false, speed: 0.5,
+    phase: Math.random() * 6.28,
+    mini: true, miniT: 0, dropping: true,
+    x: b.x, y: b.y + b.bh * 0.25, // between its legs
+    vy: 0,
+    surf: 'ground', minX: 8, maxX: CFG.W - 8,
+    baseY: CFG.GROUND_Y - 8,
+  };
+  G.enemies.push(e);
+}
+function bossStep() {
+  const b = G.boss;
+  if (!b) return;
+  if (b.poofT > 0) { b.poofT--; if (b.poofT <= 0) G.boss = null; return; }
+  if (G.st !== ST.PLAY) return;
+  if (G.freeze > 0 && b.flashT > 0) b.flashT--;
+  // bounce movement like the title screen (45deg diagonal, wall + platform rebound)
+  const dx = (b.dir & 1) ? -b.speed : b.speed;
+  const dy = (b.dir & 2) ? -b.speed : b.speed;
+  let nx = b.x + dx, ny = b.y + dy;
+  const margin = 16;
+  // walls: keep the WHOLE body inside the playfield
+  if (nx < margin + b.bw / 2) { nx = margin + b.bw / 2; b.dir ^= 1; }
+  if (nx > CFG.W - margin - b.bw / 2) { nx = CFG.W - margin - b.bw / 2; b.dir ^= 1; }
+  if (ny < 20 + b.bh / 2) { ny = 20 + b.bh / 2; b.dir ^= 2; }
+  if (ny > CFG.GROUND_Y - b.bh / 2) { ny = CFG.GROUND_Y - b.bh / 2; b.dir ^= 2; }
+  // platforms: rebound if moving into one (top face)
+  for (const pl of G.plat) {
+    const bx = b.x, by = b.y;
+    const withinX = (nx + b.bw / 2 > pl.x) && (nx - b.bw / 2 < pl.x + pl.w);
+    const approachingFromAbove = by < pl.y && ny >= pl.y;
+    if (withinX && approachingFromAbove && dy > 0) { ny = pl.y - b.bh / 2; b.dir ^= 2; break; }
+    const approachingFromBelow = by > pl.y + 6 && ny <= pl.y + 6;
+    if (withinX && approachingFromBelow && dy < 0) { ny = pl.y + 6 + b.bh / 2; b.dir ^= 2; break; }
+  }
+  b.x = nx; b.y = ny;
+  // spawn mini-replicas from between its legs
+  b.spawnCd--;
+  if (b.spawnCd <= 0) {
+    spawnMiniBoss(b);
+    b.spawnCd = 150 + Math.random() * 120;
+  }
+  // player hit: only counts while holding P (freeze)
+  if (!P.dead && P.invuln <= 0 && G.freeze > 0 &&
+      rectHit({ x: P.x, y: P.y, w: CFG.PLAYER_W, h: CFG.PLAYER_H }, bossBox(b))) {
+    b.hp--; b.flashT = 12;
+    G.shake = 5; haptic('medium');
+    beep(300 - b.hp * 15, 0.12, 'square', 0.08);
+    addPop(b.x, b.y - b.bh / 2, '' + b.hp, '#40f0f0');
+    if (b.hp <= 0) bossPoof(b);
+  }
+}
+function bossPoof(b) {
+  b.poofT = 80;
+  G.bossPoofs.push({ x: b.x, y: b.y, t: 80 });
+  // cartoonish "pffft + wobble" sound
+  if (typeof AC !== 'undefined' && AC) {
+    const t0 = AC.currentTime + 0.01;
+    const o = AC.createOscillator(); o.type = 'sawtooth';
+    const gn = AC.createGain();
+    o.frequency.setValueAtTime(1200, t0);
+    o.frequency.exponentialRampToValueAtTime(120, t0 + 0.5);
+    gn.gain.setValueAtTime(0.0001, t0);
+    gn.gain.exponentialRampToValueAtTime(0.1, t0 + 0.02);
+    gn.gain.exponentialRampToValueAtTime(0.001, t0 + 0.55);
+    o.connect(gn); gn.connect(AC.destination);
+    o.start(t0); o.stop(t0 + 0.6);
+    // add a few rising "boing" notes for the cartoon feel
+    [520, 660, 880, 1100].forEach((f, i) => setTimeout(() => beep(f, 0.12, 'square', 0.06), i * 70));
+  }
+  addScore(5000 * G.mult);
+  addPop(b.x, b.y - 10, 'K.O.!', '#f0f040');
+}
+function drawBoss() {
+  const b = G.boss;
+  if (!b) return;
+  const g = cx;
+  const img = b.frames[G.faceFrame];
+  if (img && img.complete) {
+    g.imageSmoothingEnabled = false;
+    const flick = b.flashT > 0 && (Math.floor(b.flashT / 2) % 2);
+    if (flick) { g.save(); g.globalAlpha = 0.4; }
+    g.drawImage(img, Math.round(b.x - b.bw / 2), Math.round(b.y - b.bh / 2), b.bw, b.bh);
+    if (flick) g.restore();
+    g.imageSmoothingEnabled = true;
+  }
+  // poof puffs
+  if (b.poofT > 0) {
+    const t = 80 - b.poofT;
+    for (let i = 0; i < 6; i++) {
+      const a = (i / 6) * Math.PI * 2 + t * 0.1;
+      const r = 6 + t * 0.5;
+      const px = b.x + Math.cos(a) * r, py = b.y + Math.sin(a) * r * 0.7;
+      g.fillStyle = 'rgba(255,255,255,' + Math.max(0, 1 - t / 80) + ')';
+      g.beginPath(); g.arc(px, py, 3 + t * 0.12, 0, 7); g.fill();
+    }
+  }
+  // energy bar + name (HUD)
+  const barW = 60, barX = (CFG.W - barW) / 2, barY = 20;
+  txt(g, b.name, barX - 2, barY - 3, '#fff', 7);
+  g.fillStyle = '#00000080'; g.fillRect(barX, barY, barW, 4);
+  const frac = Math.max(0, b.hp / b.maxHp);
+  g.fillStyle = frac > 0.5 ? '#40ff40' : frac > 0.25 ? '#f0c020' : '#f03030';
+  g.fillRect(barX, barY, barW * frac, 4);
+  g.fillStyle = '#ffffff40'; g.fillRect(barX, barY, barW, 4);
+  // hit markers
+  for (let i = 0; i < b.maxHp; i++) {
+    const mx = barX + (i + 0.5) * (barW / b.maxHp);
+    g.fillStyle = i < b.hp ? '#fff' : '#000';
+    g.fillRect(mx - 0.5, barY + 4.5, 1, 1);
+  }
+}
+function drawPoofs() {
+  const g = cx;
+  for (const p of G.bossPoofs) {
+    p.t--;
+    const t = 80 - p.t;
+    g.fillStyle = 'rgba(255,220,120,' + Math.max(0, 0.9 - t / 80) + ')';
+    g.beginPath(); g.arc(p.x, p.y, 4 + t * 0.4, 0, 7); g.fill();
+  }
+  G.bossPoofs = G.bossPoofs.filter(p => p.t > 0);
 }
 // ================= INPUT (multi-touch: left thumb = steer, right thumb = jump) =
 // Each physical pointer is owned by exactly ONE function. A new finger never
@@ -294,7 +478,7 @@ function playerStep() {
   if (P.y < 19) { P.y = 19; if (P.vy < 0) P.vy = 0; } // ceiling just under HUD
 }
 function playerDie() {
-  if (P.invuln > 0 || P.dead) return;
+  if (P.invuln > 0 || P.dead || G.st !== ST.PLAY) return;
   P.dead = true; G.deadT = 90; G.shake = 8;
   haptic('heavy');
   deathSound();
@@ -418,8 +602,11 @@ const ETYPES = ['owl', 'cat', 'ghost', 'slime'];
 const GROUND_TYPES = { cat: 1, slime: 1 };
 function spawnEnemy(forceType) {
   if (G.enemies.length >= 6) return;
-  const pool = ETYPES.slice(0, Math.min(2 + G.screenIdx, ETYPES.length));
-  const type = forceType || pool[Math.floor(Math.random() * pool.length)];
+  let pool = ETYPES.slice(0, Math.min(2 + G.screenIdx, ETYPES.length));
+  // "sacrifice": on boss screens, drop the first type so mini-replicas
+  // take half the spawn slots
+  if (forceType === 'sacrifice') pool = pool.slice(1);
+  const type = forceType && forceType !== 'sacrifice' ? forceType : pool[Math.floor(Math.random() * pool.length)];
   const speed = 0.35 + G.screenIdx * 0.1 + Math.min(0.3, G.elapsed / 24000);
   const dir = Math.random() < 0.5 ? 1 : -1;
   const base = { type, t: 0, dir, frozen: false, coin: false, speed, phase: Math.random() * 6.28 };
@@ -449,13 +636,28 @@ function enemyStep() {
   if (G.st === ST.PLAY && G.freeze <= 0) {
     G.spawnT--;
     if (G.spawnT <= 0) {
-      spawnEnemy();
+      // On boss screens: half the spawns are mini-replicas of the boss,
+      // the other half use the normal pool MINUS one type (sacrificed).
+      if (G.boss && Math.random() < 0.5) {
+        spawnMiniBoss(G.boss);
+      } else {
+        spawnEnemy(G.boss ? 'sacrifice' : null);
+      }
       const base = Math.max(35, 120 - G.screenIdx * 18 - Math.floor(G.elapsed / 900) * 5);
       G.spawnT = base + Math.random() * 40;
     }
   }
   for (const e of G.enemies) {
     e.t++;
+    // mini-replica: drops down from between the boss's legs for ~1s,
+    // then detaches and patrols like a normal ground enemy
+    if (e.mini && e.dropping) {
+      e.miniT++;
+      e.vy = Math.min(e.vy + 0.06, 0.9);
+      e.y += e.vy;
+      if (e.y >= e.baseY) { e.y = e.baseY; e.dropping = false; e.vy = 0; }
+      continue;
+    }
     if (G.freeze > 0 && e.coin) {
       e.y += 0.5;
       if (e.y > CFG.GROUND_Y - 4) e.y = CFG.GROUND_Y - 4;
@@ -1080,9 +1282,22 @@ function drawWorld() {
     txt(g, pu.L, pu.x - 3, pu.y + 4, '#f0f040', 9);
   }
   for (const e of G.enemies) {
+    if (e.mini) {
+      // mini-replica of the boss (roach/gorilla face frames), small
+      const img = (e.type === 'roach' ? G.roachFrames : G.gorillaFrames)[G.faceFrame];
+      if (img && img.complete) {
+        g.imageSmoothingEnabled = false;
+        const mw = e.type === 'roach' ? 14 : 16, mh = e.type === 'roach' ? 28 : 24;
+        g.drawImage(img, Math.round(e.x - mw / 2), Math.round(e.y - mh / 2), mw, mh);
+        g.imageSmoothingEnabled = true;
+      }
+      continue;
+    }
     const spr = e.coin ? SPR.coin : SPR[e.type];
     g.drawImage(spr, e.x - 8, e.y - 8, 16, 16);
   }
+  drawBoss();
+  drawPoofs();
   drawPlayer();
   for (const p of G.pops) { txt(g, p.txt, p.x - 8, p.y, p.col, 8); }
   drawHUD();
@@ -1350,6 +1565,7 @@ function tick() {
     powerupStep();
     coinStep();
     enemyStep();
+    bossStep();
     for (const p of G.pops) { p.y -= 0.4; p.t--; }
     G.pops = G.pops.filter(p => p.t > 0);
     if (P.dead) {
