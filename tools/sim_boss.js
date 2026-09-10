@@ -38,6 +38,9 @@ sandbox.window = sandbox;
 sandbox.haptic = () => {};
 sandbox.beep = () => {};
 sandbox.AC = null; // audioInit() never runs headless
+sandbox.deathSound = () => {};
+sandbox.musicStart = () => {};
+sandbox.musicStop = () => {};
 vm.createContext(sandbox);
 
 // Find the block that defines G (state) and the block with enemyStep; run only
@@ -109,16 +112,18 @@ if (S.G.boss) {
     'mini did not land correctly (dropping=' + mini.dropping + ', y=' + mini.y.toFixed(1) + ')');
 }
 
-// ---- Test 4: player hit with P reduces hp; without P, no effect ----
+// ---- Test 4: without P the boss KILLS the player; with P it takes damage ----
 S.setScreen(0);
 S.G.boss.hp = 5;
 S.G.freeze = 0; S.G.touchKill = 0;
+S.G.st = S.ST.PLAY;
 S.P.x = S.G.boss.x; S.P.y = S.G.boss.y; S.P.invuln = 0; S.P.dead = false;
 S.bossStep();
+check(S.P.dead === true, 'boss kills player on contact without P', 'player not dead after boss touch (no P)');
 check(S.G.boss && S.G.boss.hp === 5, 'no damage without P (hp stayed 5)', 'hp changed without P: ' + (S.G.boss && S.G.boss.hp));
 
 S.G.freeze = 100;
-S.G.st = S.ST.PLAY; // bossStep requires play state
+S.P.dead = false; S.P.invuln = 0;
 S.bossStep();
 check(S.G.boss && S.G.boss.hp === 4, 'hit with P reduced hp 5->4 (hitCd now ' + S.G.boss.hitCd + ')', 'hp not reduced with P: ' + (S.G.boss && S.G.boss.hp));
 
@@ -138,12 +143,11 @@ const bounced = Math.abs(S.P.vx) > 0.5 || Math.abs(S.P.vy) > 0.5;
 check(bounced, 'player bounced off boss (vx=' + S.P.vx.toFixed(1) + ', vy=' + S.P.vy.toFixed(1) + ')', 'player not bounced (vx=' + S.P.vx.toFixed(1) + ')');
 
 // ---- Test 5: final hit triggers poof (bossStep needs ST.PLAY) ----
-// playerDie() must be defined or enemyStep's touch-kill branch will throw
-sandbox.playerDie = () => {};
 S.setScreen(0);
 S.G.st = S.ST.PLAY;
 S.G.boss.hp = 1; S.G.freeze = 100;
-S.P.x = S.G.boss.x; S.P.y = S.G.boss.y; S.P.invuln = 0;
+S.P.dead = false; S.P.invuln = 0;
+S.P.x = S.G.boss.x; S.P.y = S.G.boss.y;
 S.bossStep();
 const dead = !S.G.boss || S.G.boss.poofT > 0;
 check(dead, 'final hit triggered poof (poofT=' + (S.G.boss && S.G.boss.poofT) + ')', 'no poof on final hit');

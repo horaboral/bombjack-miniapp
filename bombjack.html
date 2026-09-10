@@ -242,7 +242,7 @@ function spawnMiniBoss(b) {
   const e = {
     type, t: 0, dir: Math.random() < 0.5 ? 1 : -1,
     frozen: false, coin: false, speed: 0.4 + Math.random() * 0.2,
-    phase: Math.random() * 6.28,
+    phase: Math.random() * 6.28, jumpCd: 600,
     mini: true, miniT: 0, dropping: true,
     x, y: b.y + b.bh * 0.45, // in front of (just below) the boss's center
     vy: 0,
@@ -287,11 +287,16 @@ function bossStep() {
     b.spawnCd = 150 + Math.random() * 120;
   }
   if (b.hitCd > 0) b.hitCd--;
-  // player hit: only counts while holding P (freeze). The boss BOUNCES the
-  // player off in the opposite direction, and each hit has a cooldown so a
-  // single pass can't rack up many hits — it should be hard to kill.
-  if (!P.dead && P.invuln <= 0 && vulnerable &&
+  // Player collision:
+  //  - WITHOUT P: the boss is invincible and KILLS Bombjack on contact.
+  //  - WITH P (freeze): touching it damages it 1/10 (cooldown), bounces the
+  //    player off, and does NOT hurt the player.
+  if (!P.dead && P.invuln <= 0 &&
       rectHit({ x: P.x, y: P.y, w: CFG.PLAYER_W, h: CFG.PLAYER_H }, bossBox(b))) {
+    if (!vulnerable) {
+      playerDie();
+      return;
+    }
     if (b.hitCd === 0) {
       b.hp--; b.flashT = 12; b.hitCd = 45;
       G.shake = 5; haptic('medium');
@@ -758,7 +763,10 @@ function enemyStep() {
     if (G.spawnT <= 0) {
       // On boss screens: half the spawns are mini-replicas of the boss,
       // the other half use the normal pool MINUS one type (sacrificed).
-      if (G.boss && Math.random() < 0.5) {
+      // If minis already dominate (>=4 alive), force a regular spawn so
+      // they can't pile up while you clear the normal enemies.
+      const liveMinis = G.enemies.filter(e => e.mini).length;
+      if (G.boss && Math.random() < 0.5 && liveMinis < 4) {
         spawnMiniBoss(G.boss);
       } else {
         spawnEnemy(G.boss ? 'sacrifice' : null);
@@ -795,13 +803,8 @@ function enemyStep() {
       }
       continue;
     }
-    if (e.mini) {
-      // mini-replica: same walking/jumping rules as regular ground enemies
-      stepEnemyWalk(e);
-      continue;
-    }
     stepEnemyWalk(e);
-    // touch
+    // touch — applies to minis too (they are lethal like regular enemies)
     if (!P.dead && P.invuln <= 0 && !e.coin) {
       if (rectHit({ x: P.x + 1, y: P.y + 1, w: CFG.PLAYER_W - 2, h: CFG.PLAYER_H - 2 }, enemyBox(e))) {
         if (G.touchKill > 0) {
@@ -1707,7 +1710,7 @@ function tick() {
     G.clearT--;
     if (G.clearT <= 0) {
       G.round++;
-      setScreen(G.round % 5);
+      setScreen((G.round - 1) % 5);
       G.st = ST.PLAY;
       G.msg = SCREENS[G.screenIdx].name; G.msgT = 90;
     }
@@ -1806,7 +1809,7 @@ function render() {
   }
   if (G.st === ST.ROUNDCLEAR) {
     drawWorld();
-    centerPanel([['ROUND CLEAR', '#f0f040', 16], [G.litThisRound + ' LIT BOMBS', '#fff', 10]], 'next: ' + SCREENS[(G.round + 1) % 5].name);
+    centerPanel([['ROUND CLEAR', '#f0f040', 16], [G.litThisRound + ' LIT BOMBS', '#fff', 10]], 'next: ' + SCREENS[(G.round) % 5].name);
     cx.restore();
     return;
   }
