@@ -1519,19 +1519,17 @@ function drawMitsubishi(g, x, y, size, rotation) {
     if (i === 0) g.moveTo(px, py); else g.lineTo(px, py);
   }
   g.closePath(); g.fill();
-  // 3 red trapezoids, wide base outward, vertex pointing toward center
+  // 3 red trapezoids: pointy vertex toward center, wide base outward
   g.fillStyle = '#cc0000';
-  const d = size * 0.42;
+  const d = size * 0.45;
   for (let i = 0; i < 3; i++) {
     const baseAng = -Math.PI / 2 + i * (2 * Math.PI / 3);
-    // trapezoid positioned along the radial direction
-    const r1 = d * 0.15; // inner radius (vertex near center)
-    const r2 = d * 0.85; // outer radius (wide base)
-    const halfW1 = d * 0.12; // half-width at inner end (vertex ~point)
-    const halfW2 = d * 0.50; // half-width at outer end (wide base)
+    const r1 = d * 0.10;  // inner: near the center (pointy end)
+    const r2 = d * 0.95;  // outer: wide base near the edge
+    const halfW1 = d * 0.04; // very narrow at inner end (≈vertex)
+    const halfW2 = d * 0.52; // wide at outer end
     g.save();
     g.rotate(baseAng);
-    // draw trapezoid in local coords: x-axis = radial, y-axis = tangent
     g.beginPath();
     g.moveTo(r1, -halfW1);
     g.lineTo(r2, -halfW2);
