@@ -1522,12 +1522,12 @@ function drawMitsubishi(g, x, y, size, rotation) {
   // 3 elongated rhombuses (4 sides): pointy vertex toward center,
   // pointy vertex outward, widest at the sides — meeting at a single center point
   g.fillStyle = '#cc0000';
-  const d = size * 0.55;
+  const d = size * 0.82;
   for (let i = 0; i < 3; i++) {
     const baseAng = -Math.PI / 2 + i * (2 * Math.PI / 3);
     const r1 = 0;           // inner vertex at the center
-    const r2 = d * 0.95;    // outer vertex near the edge
-    const halfW = d * 0.22; // half-width at the widest point (mid-length)
+    const r2 = d * 0.95;    // outer vertex touching the hex edge
+    const halfW = d * 0.32; // wider half-width at mid-length
     g.save();
     g.rotate(baseAng);
     g.beginPath();
