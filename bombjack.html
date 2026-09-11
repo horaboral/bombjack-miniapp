@@ -1519,23 +1519,24 @@ function drawMitsubishi(g, x, y, size, rotation) {
     if (i === 0) g.moveTo(px, py); else g.lineTo(px, py);
   }
   g.closePath(); g.fill();
-  // 3 red diamonds pointing outward (top, bottom-left, bottom-right)
+  // 3 red trapezoids, wide base outward, vertex pointing toward center
   g.fillStyle = '#cc0000';
-  const d = size * 0.38; // diamond half-length
+  const d = size * 0.42;
   for (let i = 0; i < 3; i++) {
     const baseAng = -Math.PI / 2 + i * (2 * Math.PI / 3);
-    const cx2 = Math.cos(baseAng) * d * 0.7;
-    const cy2 = Math.sin(baseAng) * d * 0.7;
-    g.beginPath();
-    // diamond: 4 points, elongated along the radial direction
-    const rx = d * 0.55, ry = d * 0.3;
+    // trapezoid positioned along the radial direction
+    const r1 = d * 0.15; // inner radius (vertex near center)
+    const r2 = d * 0.85; // outer radius (wide base)
+    const halfW1 = d * 0.12; // half-width at inner end (vertex ~point)
+    const halfW2 = d * 0.50; // half-width at outer end (wide base)
     g.save();
-    g.translate(cx2, cy2);
-    g.rotate(baseAng + Math.PI / 2);
-    g.moveTo(0, -ry);
-    g.lineTo(rx, 0);
-    g.lineTo(0, ry);
-    g.lineTo(-rx, 0);
+    g.rotate(baseAng);
+    // draw trapezoid in local coords: x-axis = radial, y-axis = tangent
+    g.beginPath();
+    g.moveTo(r1, -halfW1);
+    g.lineTo(r2, -halfW2);
+    g.lineTo(r2, halfW2);
+    g.lineTo(r1, halfW1);
     g.closePath();
     g.fill();
     g.restore();
