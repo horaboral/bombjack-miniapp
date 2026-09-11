@@ -151,7 +151,7 @@ function setScreen(idx) {
   for (const pl of G.plat) for (let i = 0; i < pl.w; i++) G.platTop.set(pl.x + i, pl.y);
   G.bombs = s.bombs.map(b => ({ x: b[0], y: b[1], lit: false, pat: Math.random() * 6.28, got: false }));
   G.bombsGot = 0; G.litThisRound = 0; G.litCount = 0; G.litBonusNext = 10000;
-  G.meter = 0; G.spawnT = Math.max(50, 170 - idx * 20); G.elapsed = 0; G.freeze = 0; G.touchKill = 0;
+  G.meter = 0; G.spawnT = Math.max(50, 170 - idx * 20); G.elapsed = 0; G.freeze = 0; G.touchKill = 0; G.pTimer = 0;
   G.enemies = []; G.coins = []; G.powerups = []; G.pops = [];
   P.x = 70; P.y = CFG.GROUND_Y - CFG.PLAYER_H; P.vx = 0; P.vy = 0;
   P.grounded = true; P.dead = false; P.jumping = false; P.glide = false; P.invuln = 60; P.face = 1;
@@ -566,7 +566,8 @@ function bombStep() {
       addPop(b.x, b.y, '' + pts, b.lit ? '#000' : '#f04040');
       G.meter += b.lit ? 2 : 1;
       if (b.lit) { G.litThisRound++; }
-      if (G.meter >= 10) { G.meter = 0; spawnPowerup(); }
+      // OLD RULE (kept for reference): 10 bombs collected → random powerup
+      // if (G.meter >= 10) { G.meter = 0; spawnPowerup(); }
       haptic('light');
     }
   }
@@ -594,6 +595,17 @@ function spawnPowerup() {
   G.powerups.push({ x: 6 + Math.random() * (CFG.W - 12), y: 30 + Math.random() * 70, L, vx, vy, t: 0 });
 }
 function powerupStep() {
+  // NEW RULE: P (Mitsubishi) spawns every 15 seconds, overriding the meter rule
+  if (G.pTimer == null) G.pTimer = 0;
+  G.pTimer++;
+  if (G.pTimer >= 900) { // 900 frames = 15s @ 60fps
+    G.pTimer = 0;
+    const dir = Math.floor(Math.random() * 4);
+    const sp = 0.5;
+    const vx = (dir & 1) ? sp : -sp;
+    const vy = (dir & 2) ? sp : -sp;
+    G.powerups.push({ x: 6 + Math.random() * (CFG.W - 12), y: 30 + Math.random() * 70, L: 'P', vx, vy, t: 0 });
+  }
   for (const pu of G.powerups) {
     pu.t++; pu.x += pu.vx; pu.y += pu.vy;
     // bounce off EXTERNAL borders only (left/right walls + top HUD + ground)
@@ -1493,14 +1505,56 @@ function drawPlayer() {
   if (P.face < 0) { cx.save(); cx.translate(P.x + CFG.PLAYER_W, 0); cx.scale(-1, 1); cx.drawImage(spr, 0, P.y, CFG.PLAYER_W, CFG.PLAYER_H); cx.restore(); }
   else cx.drawImage(spr, P.x, P.y, CFG.PLAYER_W, CFG.PLAYER_H);
 }
+// Mitsubishi trident logo (3 red diamonds, no letters) — used for the P powerup
+function drawMitsubishi(g, x, y, size, rotation) {
+  g.save();
+  g.translate(x, y);
+  g.rotate(rotation);
+  // white hex background
+  g.fillStyle = '#fff';
+  g.beginPath();
+  for (let i = 0; i < 6; i++) {
+    const a = i * Math.PI / 3 - Math.PI / 6;
+    const px = Math.cos(a) * size * 0.85, py = Math.sin(a) * size * 0.85;
+    if (i === 0) g.moveTo(px, py); else g.lineTo(px, py);
+  }
+  g.closePath(); g.fill();
+  // 3 red diamonds pointing outward (top, bottom-left, bottom-right)
+  g.fillStyle = '#cc0000';
+  const d = size * 0.38; // diamond half-length
+  for (let i = 0; i < 3; i++) {
+    const baseAng = -Math.PI / 2 + i * (2 * Math.PI / 3);
+    const cx2 = Math.cos(baseAng) * d * 0.7;
+    const cy2 = Math.sin(baseAng) * d * 0.7;
+    g.beginPath();
+    // diamond: 4 points, elongated along the radial direction
+    const rx = d * 0.55, ry = d * 0.3;
+    g.save();
+    g.translate(cx2, cy2);
+    g.rotate(baseAng + Math.PI / 2);
+    g.moveTo(0, -ry);
+    g.lineTo(rx, 0);
+    g.lineTo(0, ry);
+    g.lineTo(-rx, 0);
+    g.closePath();
+    g.fill();
+    g.restore();
+  }
+  g.restore();
+}
 function drawWorld() {
   const g = cx;
   drawBG(SCREENS[G.screenIdx], G.elapsed);
   for (const b of G.bombs) if (!b.got) g.drawImage(SPR[b.lit ? 'bomb1' : 'bomb0'], b.x - 5, b.y - 5, 10, 10);
   for (const c of G.coins) g.drawImage(SPR.coin, c.x - 4, c.y - 4, 8, 8);
   for (const pu of G.powerups) {
-    g.drawImage(SPR.hex, pu.x - 7, pu.y - 7, 14, 14);
-    txt(g, pu.L, pu.x - 3, pu.y + 4, '#f0f040', 9);
+    if (pu.L === 'P') {
+      // rotating Mitsubishi logo
+      drawMitsubishi(g, pu.x, pu.y, 9, pu.t * 0.05);
+    } else {
+      g.drawImage(SPR.hex, pu.x - 7, pu.y - 7, 14, 14);
+      txt(g, pu.L, pu.x - 3, pu.y + 4, '#f0f040', 9);
+    }
   }
   for (const e of G.enemies) {
     if (e.mini) {
