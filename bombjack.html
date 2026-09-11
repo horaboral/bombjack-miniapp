@@ -124,6 +124,7 @@ const G = {
   hiscore: JSON.parse(localStorage.getItem('bj_hiscore') || '[]'),
   lives: CFG.LIVES, round: 1, screenIdx: 0, mult: 1,
   nextLifeAt: CFG.EXTRA_AT, freeze: 0, touchKill: 0,
+  sFire: 0, sFireT: 0, fireballs: [],
   litCount: 0, litThisRound: 0, bombsGot: 0, litBonusNext: 10000,
   meter: 0, spawnT: 150, elapsed: 0, deadT: 0, clearT: 0,
   bombs: [], enemies: [], coins: [], powerups: [], pops: [],
@@ -152,6 +153,7 @@ function setScreen(idx) {
   G.bombs = s.bombs.map(b => ({ x: b[0], y: b[1], lit: false, pat: Math.random() * 6.28, got: false }));
   G.bombsGot = 0; G.litThisRound = 0; G.litCount = 0; G.litBonusNext = 10000;
   G.meter = 0; G.spawnT = Math.max(50, 170 - idx * 20); G.elapsed = 0; G.freeze = 0; G.touchKill = 0; G.pTimer = 0;
+  G.sFire = 0; G.sFireT = 0; G.fireballs = [];
   G.enemies = []; G.coins = []; G.powerups = []; G.pops = [];
   P.x = 70; P.y = CFG.GROUND_Y - CFG.PLAYER_H; P.vx = 0; P.vy = 0;
   P.grounded = true; P.dead = false; P.jumping = false; P.glide = false; P.invuln = 60; P.face = 1;
@@ -595,7 +597,7 @@ function spawnPowerup() {
   G.powerups.push({ x: 6 + Math.random() * (CFG.W - 12), y: 30 + Math.random() * 70, L, vx, vy, t: 0 });
 }
 function powerupStep() {
-  // NEW RULE: P (Mitsubishi) spawns every 15 seconds, overriding the meter rule
+  // NEW RULE: P (Mitsubishi) and S (Superman) spawn every 15 seconds, overriding the meter rule
   if (G.pTimer == null) G.pTimer = 0;
   G.pTimer++;
   if (G.pTimer >= 900) { // 900 frames = 15s @ 60fps
@@ -605,6 +607,11 @@ function powerupStep() {
     const vx = (dir & 1) ? sp : -sp;
     const vy = (dir & 2) ? sp : -sp;
     G.powerups.push({ x: 6 + Math.random() * (CFG.W - 12), y: 30 + Math.random() * 70, L: 'P', vx, vy, t: 0 });
+    // S spawns at the same time, opposite side
+    const dir2 = (dir + 2) % 4;
+    const vx2 = (dir2 & 1) ? sp : -sp;
+    const vy2 = (dir2 & 2) ? sp : -sp;
+    G.powerups.push({ x: 6 + Math.random() * (CFG.W - 12), y: 30 + Math.random() * 70, L: 'S', vx: vx2, vy: vy2, t: 0 });
   }
   for (const pu of G.powerups) {
     pu.t++; pu.x += pu.vx; pu.y += pu.vy;
@@ -631,13 +638,57 @@ function powerupStep() {
         G.lives++;
         addPop(pu.x, pu.y + 10, '1UP', '#40ff40');
       } else if (pu.L === 'S') {
-        G.touchKill = 240;
-        addPop(pu.x, pu.y + 10, 'TOUCH KILL', '#ff40ff');
+        // S: hero throws fireballs for 5 seconds (300 frames)
+        G.sFire = 300;
+        G.sFireT = 0;
+        addPop(pu.x, pu.y + 10, 'FIRE!', '#ff4400');
       }
       haptic('medium');
     }
   }
   G.powerups = G.powerups.filter(p => !p.dead);
+}
+// S powerup: hero throws 4 fireballs (2 per side) every 1 second
+function fireballStep() {
+  if (G.sFire > 0) {
+    G.sFireT++;
+    G.sFire--;
+    // throw every 60 frames (1s)
+    if (G.sFireT >= 60) {
+      G.sFireT = 0;
+      const px = P.x + CFG.PLAYER_W / 2, py = P.y + CFG.PLAYER_H / 2;
+      const facing = P.face < 0 ? -1 : 1;
+      // 2 balls each side: slightly angled up
+      for (const side of [1, -1]) {
+        for (const ang of [-0.3, 0.3]) {
+          G.fireballs.push({ x: px + side * 6, y: py, vx: side * 2.5, vy: ang * 2, t: 0 });
+        }
+      }
+    }
+  }
+  // step all fireballs
+  for (const fb of G.fireballs) {
+    fb.t++;
+    fb.x += fb.vx; fb.y += fb.vy;
+    // expire off-screen or after 2s
+    if (fb.t > 120 || fb.x < 0 || fb.x > CFG.W || fb.y < 0 || fb.y > CFG.H) fb.dead = true;
+    // hit enemies
+    for (const e of G.enemies) {
+      if (e.dead || e.coin) continue;
+      const eb = enemyBox(e);
+      if (rectHit({ x: fb.x - 3, y: fb.y - 3, w: 6, h: 6 }, eb)) {
+        fb.dead = true;
+        e.dead = true;
+        const pts = 500 * G.mult;
+        addScore(pts);
+        addPop(e.x, e.y, '' + pts, '#ff4400');
+        haptic('light');
+        break;
+      }
+    }
+  }
+  G.fireballs = G.fireballs.filter(f => !f.dead);
+  G.enemies = G.enemies.filter(e => !e.dead);
 }
 function dropCoin(x, y) {
   const cols = [100, 300, 1000, 2000];
@@ -1473,6 +1524,7 @@ function drawHUD() {
   txt(g, 'HI ' + String(Math.max(G.hi, G.score)).padStart(6, '0'), 4, CFG.H - 4, '#f0f040', 7);
   txt(g, 'x' + G.mult, 70, CFG.H - 4, '#fff', 7);
   if (G.freeze > 0) txt(g, 'FREEZE', 92, CFG.H - 4, '#40f0f0', 7);
+  else if (G.sFire > 0) txt(g, 'FIRE!', 92, CFG.H - 4, '#ff4400', 7);
   else if (G.touchKill > 0) txt(g, 'TOUCH KILL', 86, CFG.H - 4, '#ff40ff', 7);
   if (G.msgT > 0) {
     g.font = 'bold 12px monospace';
@@ -1505,11 +1557,13 @@ function drawPlayer() {
   if (P.face < 0) { cx.save(); cx.translate(P.x + CFG.PLAYER_W, 0); cx.scale(-1, 1); cx.drawImage(spr, 0, P.y, CFG.PLAYER_W, CFG.PLAYER_H); cx.restore(); }
   else cx.drawImage(spr, P.x, P.y, CFG.PLAYER_W, CFG.PLAYER_H);
 }
-// Mitsubishi trident logo (3 red diamonds, no letters) — used for the P powerup
-function drawMitsubishi(g, x, y, size, rotation) {
+// Mitsubishi trident logo (3 red diamonds, no letters) — P powerup
+// Z-axis rotation: scales X by cos(angle) to simulate rotation out of the screen
+function drawMitsubishi(g, x, y, size, rotT) {
+  const zScale = Math.abs(Math.cos(rotT * 0.04)); // 0..1, oscillates
   g.save();
   g.translate(x, y);
-  g.rotate(rotation);
+  g.scale(zScale, 1); // Z-axis: squeeze horizontally
   // white hex background
   g.fillStyle = '#fff';
   g.beginPath();
@@ -1519,26 +1573,39 @@ function drawMitsubishi(g, x, y, size, rotation) {
     if (i === 0) g.moveTo(px, py); else g.lineTo(px, py);
   }
   g.closePath(); g.fill();
-  // 3 elongated rhombuses (4 sides): pointy vertex toward center,
-  // pointy vertex outward, widest at the sides — meeting at a single center point
+  // 3 elongated rhombuses
   g.fillStyle = '#cc0000';
   const d = size * 0.82;
   for (let i = 0; i < 3; i++) {
     const baseAng = -Math.PI / 2 + i * (2 * Math.PI / 3);
-    const r1 = 0;           // inner vertex at the center
-    const r2 = d * 0.95;    // outer vertex touching the hex edge
-    const halfW = d * 0.32; // wider half-width at mid-length
+    const r1 = 0, r2 = d * 0.95, halfW = d * 0.32;
     g.save();
     g.rotate(baseAng);
     g.beginPath();
-    g.moveTo(r1, 0);                    // inner point (center)
-    g.lineTo((r1 + r2) / 2, -halfW);   // upper side
-    g.lineTo(r2, 0);                    // outer point
-    g.lineTo((r1 + r2) / 2, halfW);    // lower side
+    g.moveTo(r1, 0);
+    g.lineTo((r1 + r2) / 2, -halfW);
+    g.lineTo(r2, 0);
+    g.lineTo((r1 + r2) / 2, halfW);
     g.closePath();
     g.fill();
     g.restore();
   }
+  g.restore();
+}
+// Superman S powerup — white circle with red S, Z-axis rotation
+function drawSupermanS(g, x, y, size, rotT) {
+  const zScale = Math.abs(Math.cos(rotT * 0.04));
+  g.save();
+  g.translate(x, y);
+  g.scale(zScale, 1);
+  // white circle
+  g.fillStyle = '#fff';
+  g.beginPath(); g.arc(0, 0, size * 0.85, 0, 7); g.fill();
+  // red S (stylized)
+  g.fillStyle = '#cc0000';
+  g.font = 'bold ' + Math.round(size * 1.1) + 'px sans-serif';
+  g.textAlign = 'center'; g.textBaseline = 'middle';
+  g.fillText('S', 0, 1);
   g.restore();
 }
 function drawWorld() {
@@ -1548,12 +1615,20 @@ function drawWorld() {
   for (const c of G.coins) g.drawImage(SPR.coin, c.x - 4, c.y - 4, 8, 8);
   for (const pu of G.powerups) {
     if (pu.L === 'P') {
-      // rotating Mitsubishi logo
-      drawMitsubishi(g, pu.x, pu.y, 9, pu.t * 0.05);
+      drawMitsubishi(g, pu.x, pu.y, 9, pu.t);
+    } else if (pu.L === 'S') {
+      drawSupermanS(g, pu.x, pu.y, 9, pu.t);
     } else {
       g.drawImage(SPR.hex, pu.x - 7, pu.y - 7, 14, 14);
       txt(g, pu.L, pu.x - 3, pu.y + 4, '#f0f040', 9);
     }
+  }
+  // fireballs (S powerup effect)
+  for (const fb of G.fireballs) {
+    g.fillStyle = '#ff4400';
+    g.beginPath(); g.arc(fb.x, fb.y, 3, 0, 7); g.fill();
+    g.fillStyle = '#ffcc00';
+    g.beginPath(); g.arc(fb.x, fb.y, 1.5, 0, 7); g.fill();
   }
   for (const e of G.enemies) {
     if (e.mini) {
@@ -1846,6 +1921,7 @@ function tick() {
     playerStep();
     bombStep();
     powerupStep();
+    fireballStep();
     coinStep();
     enemyStep();
     bossStep();
