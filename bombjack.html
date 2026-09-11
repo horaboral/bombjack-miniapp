@@ -468,21 +468,19 @@ function playerStep() {
     if (P.grounded) {
       P.vy = -CFG.JUMP_V; P.grounded = false; P.jumping = true; P.glide = false;
       addScore(10);
-    } else if (P.vy > -1.2) {
-      // mid-air tap = re-jump (the 1984 game lets you chain jumps while rising)
-      if (P.vy > -CFG.JUMP_V * 0.7) P.vy = -CFG.JUMP_V * 0.85;
-      P.glide = true;
     }
+    // mid-air taps have no effect (no double-jump)
   }
   if (!P.grounded) {
     P.vy += CFG.GRAV;
-    // RISE ZONE: the hero keeps rising only while the steer direction
-    // points upward within 50..130 deg from horizontal (majorly up).
-    // Outside that band (or thumb released) the rise ends; steering up then
-    // only fights gravity (slower fall / glide), it does NOT lift.
+    // RISE ZONE: the hero keeps rising ONLY while a jump is in progress
+    // (P.jumping) AND the steer points upward within 50..130 deg from
+    // horizontal. Once the jump arc ends (or the thumb leaves the band)
+    // the rise stops — steering up then only glides (slower fall), never
+    // lifts. This prevents "point up from any altitude and fly to the top".
     const mag = Math.hypot(IN.sx, IN.sy);
     let rising = false;
-    if (mag > 0.05 && IN.sy < 0) {
+    if (P.jumping && mag > 0.05 && IN.sy < 0) {
       const ang = Math.atan2(-IN.sy, IN.sx); // 0=right, PI/2=straight up, PI=left
       rising = (ang >= CFG.RISE_MIN_A && ang <= CFG.RISE_MAX_A);
     }
@@ -708,6 +706,7 @@ function stepEnemyWalk(e) {
       e.y = e.baseY;
       e.dir = e.x < cx ? 1 : -1; // walk away from the middle, 50/50 side
       e.jumpCd = 600;
+      e._fallFrom = null;
       return;
     }
     e.jumpCd = 600; // no higher platform; retry in ~10s
@@ -735,25 +734,39 @@ function stepEnemyWalk(e) {
   const overEdge = (e.surf !== 'ground') &&
     ((e.x < e.minX) || (e.x > e.maxX));
   if (overEdge) {
-    // falling off a platform tip
+    // falling off a platform tip — land on the surface DIRECTLY BELOW the
+    // platform it fell from (next lower platform or ground), not at its x
+    // (which is now beside the platform). Track the source platform so the
+    // landing spot is the correct lower surface.
+    if (e._fallFrom == null) e._fallFrom = e.baseY + 17; // the platform top it fell from
     e.vy = (e.vy == null ? 0 : e.vy) + 0.15;
     e.y += e.vy;
-    // land on a lower surface or the ground
-    const landY = surfaceAtX(e.x) - (isFly ? 17 : 8);
+    // find the highest platform BELOW the source that is under e.x, else ground
+    const srcTop = e._fallFrom;
+    let landY = CFG.GROUND_Y;
+    let landPlat = null;
+    for (const p2 of G.plat) {
+      if (p2.y >= srcTop - 1) continue; // must be below the source
+      if (e.x > p2.x - 4 && e.x < p2.x + p2.w + 4) {
+        if (p2.y < landY) { landY = p2.y; landPlat = p2; }
+      }
+    }
+    landY -= (isFly ? 17 : 8);
     if (e.y >= landY) {
       e.y = landY;
       e.vy = 0;
       e.baseY = landY;
-      e.surf = (landY + (isFly ? 17 : 8) >= CFG.GROUND_Y - 1) ? 'ground' : e.surf;
-      if (e.surf === 'ground') { e.minX = 8; e.maxX = CFG.W - 8; }
-      else {
-        // find the platform under it to set bounds
-        let pl = null;
-        for (const p2 of G.plat) if (e.x > p2.x && e.x < p2.x + p2.w && Math.abs((e.baseY + (isFly ? 17 : 8)) - p2.y) < 2) { pl = p2; break; }
-        if (pl) { e.minX = pl.x + 6; e.maxX = pl.x + pl.w - 6; } else { e.surf = 'ground'; e.minX = 8; e.maxX = CFG.W - 8; e.baseY = CFG.GROUND_Y - (isFly ? 17 : 8); }
+      e._fallFrom = null;
+      if (landPlat) {
+        e.surf = 'plat';
+        e.minX = landPlat.x + 6; e.maxX = landPlat.x + landPlat.w - 6;
+      } else {
+        e.surf = 'ground';
+        e.minX = 8; e.maxX = CFG.W - 8;
       }
     }
   } else {
+    e._fallFrom = null;
     e.y = e.baseY + (isFly ? Math.sin(e.t * 0.08 + e.phase) * 3 : -Math.abs(Math.sin(e.t * 0.2)) * hop);
   }
 }
