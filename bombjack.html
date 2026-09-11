@@ -1519,15 +1519,16 @@ function drawMitsubishi(g, x, y, size, rotation) {
     if (i === 0) g.moveTo(px, py); else g.lineTo(px, py);
   }
   g.closePath(); g.fill();
-  // 3 red trapezoids: pointy vertex toward center, wide base outward
+  // 3 red trapezoids (diamond-like): flat narrow inner end meeting at center,
+  // wider flat base outward — each takes ~⅓ of the space, touching at a single point
   g.fillStyle = '#cc0000';
-  const d = size * 0.45;
+  const d = size * 0.52;
   for (let i = 0; i < 3; i++) {
     const baseAng = -Math.PI / 2 + i * (2 * Math.PI / 3);
-    const r1 = d * 0.10;  // inner: near the center (pointy end)
-    const r2 = d * 0.95;  // outer: wide base near the edge
-    const halfW1 = d * 0.04; // very narrow at inner end (≈vertex)
-    const halfW2 = d * 0.52; // wide at outer end
+    const r1 = 0;          // inner end at the center point
+    const r2 = d * 0.92;   // outer end near the edge
+    const halfW1 = d * 0.14; // narrow but flat inner edge
+    const halfW2 = d * 0.48; // wide flat base
     g.save();
     g.rotate(baseAng);
     g.beginPath();
