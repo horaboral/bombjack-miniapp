@@ -195,5 +195,27 @@ S.enemyStep();
 check(!m2.dead || S.G.enemies.filter(e => e === m2).length === 0,
   'frozen mini collected as jelly (score ' + score0 + '->' + S.G.score + ')', 'frozen mini not collectible');
 
+// ---- Test 9: boss mini-spawn is GATED when 4+ minis are alive ----
+S.setScreen(0);
+S.G.st = S.ST.PLAY;
+S.G.boss.hp = 10; S.G.boss.spawnCd = 0; // force immediate spawn attempt
+S.G.enemies = [];
+// fill with 4 fake minis
+for (let i = 0; i < 4; i++) S.G.enemies.push({ mini: true, type: 'roach', x: 10 + i * 20, y: 200 });
+const minisBefore = S.G.enemies.filter(e => e.mini).length;
+S.bossStep();
+const minisAfter = S.G.enemies.filter(e => e.mini).length;
+check(minisAfter === minisBefore,
+  'boss did NOT spawn a new mini when 4 minis were alive (count ' + minisBefore + '->' + minisAfter + ')',
+  'boss spawned an extra mini despite 4 already alive (count ' + minisBefore + '->' + minisAfter + ')');
+// now clear one mini and verify spawn works again
+S.G.enemies.pop();
+S.G.boss.spawnCd = 0;
+S.bossStep();
+const minisAfter2 = S.G.enemies.filter(e => e.mini).length;
+check(minisAfter2 === minisBefore,
+  'boss spawned a mini again after a slot freed up (count ' + (minisBefore - 1) + '->' + minisAfter2 + ')',
+  'boss did not respawn after slot freed (count ' + minisAfter2 + ')');
+
 console.log(ok ? '=== ALL BOSS TESTS PASSED ===' : '=== SOME TESTS FAILED ===');
 process.exit(ok ? 0 : 1);

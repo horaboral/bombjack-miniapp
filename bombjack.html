@@ -280,11 +280,16 @@ function bossStep() {
     if (withinX && approachingFromBelow && dy < 0) { ny = pl.y + 6 + b.bh / 2; b.dir ^= 2; break; }
   }
   b.x = nx; b.y = ny;
-  // spawn mini-replicas from between its legs
-  b.spawnCd--;
-  if (b.spawnCd <= 0) {
-    spawnMiniBoss(b);
-    b.spawnCd = 150 + Math.random() * 120;
+  // spawn mini-replicas from between its legs (only when fewer than 4 alive)
+  const liveMinis2 = G.enemies.filter(e => e.mini).length;
+  if (liveMinis2 < 4) {
+    b.spawnCd--;
+    if (b.spawnCd <= 0) {
+      spawnMiniBoss(b);
+      b.spawnCd = 150 + Math.random() * 120;
+    }
+  } else {
+    b.spawnCd = 30; // stay on short cooldown until a slot frees up
   }
   if (b.hitCd > 0) b.hitCd--;
   // Player collision:
@@ -694,8 +699,8 @@ function nextPlatformAbove(e) {
   for (const pl of G.plat) {
     if (pl.y + 17 >= curTop - 2) continue;      // must be higher (smaller y)
     if (pl.w < 22) continue;                    // needs room to walk
-    // prefer the one closest above (lowest y that is still above curTop)
-    if (!best || pl.y < best.y) best = pl;
+    // prefer the one closest above: largest y that is still above curTop
+    if (!best || pl.y > best.y) best = pl;
   }
   return best;
 }
@@ -826,7 +831,7 @@ function enemyStep() {
     // SOLID — it lands on the first surface under it and stops.
     if (e.mini && e.dropping) {
       e.miniT++;
-      e.vy = Math.min(e.vy + 0.08, 1.4);
+      e.vy = Math.min(e.vy + CFG.GRAV, 4);
       e.y += e.vy;
       const surfY = surfaceAtX(e.x);
       if (e.y >= surfY - 8) {

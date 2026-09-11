@@ -69,20 +69,24 @@ for (let f = 0; f < 120; f++) {
 check(fell || turned, 'at platform tip: enemy either turns back or falls (fell=' + fell + ', turned=' + turned + ', dx=' + (e.x - startE).toFixed(1) + ')',
   'enemy neither turned nor fell at the tip');
 
-// ---- Test 2: 1-LEVEL jump — on the LOWEST platform, jump goes to the nearest
-// upper platform (never 2+ levels). Force the jump path deterministically:
-// set _jumpStop=1 / _jumpTarget so the next stepEnemyWalk executes immediately.
+// ---- Test 2: 1-LEVEL jump — jump goes to the NEAREST platform above
+// (not the highest). Force the jump path deterministically.
 let lowest = null, nearestAbove = null;
 for (const p of S.G.plat) {
   if (!lowest || p.y > lowest.y) lowest = p;
 }
-// nearest platform above the lowest one
+// nearest platform above the lowest one: largest y that is still above
 for (const p of S.G.plat) {
   if (p.y + 17 >= lowest.y - 2) continue;
   if (p.w < 22) continue;
-  if (!nearestAbove || p.y < nearestAbove.y) nearestAbove = p;
+  if (!nearestAbove || p.y > nearestAbove.y) nearestAbove = p;
 }
 check(!!nearestAbove, 'test2 setup: a platform exists directly above the lowest one', 'no platform above the lowest');
+// verify it's NOT the top platform (would indicate the old "highest" bug)
+let topPlat = null; for (const p of S.G.plat) if (!topPlat || p.y < topPlat.y) topPlat = p;
+check(nearestAbove !== topPlat || S.G.plat.length <= 2,
+  'nearest-above is the CLOSEST platform (y=' + nearestAbove.y + '), not the top (y=' + topPlat.y + ')',
+  'nearest-above picked the topmost platform (old bug)');
 const e2 = S.spawnEnemy('cat');
 e2.surf = 'plat'; e2.minX = lowest.x + 6; e2.maxX = lowest.x + lowest.w - 6;
 e2.baseY = lowest.y - 17; e2.y = e2.baseY; e2.x = lowest.x + lowest.w / 2; e2.dir = 1;
@@ -91,7 +95,7 @@ const beforeY = e2.baseY;
 S.stepEnemyWalk(e2); // frame 1: stop decrement (1->0)
 S.stepEnemyWalk(e2); // frame 2: execute jump
 check(e2.baseY === nearestAbove.y - 17,
-  'enemy jumped exactly ONE level up (baseY ' + beforeY + ' -> ' + e2.baseY + ', target ' + (nearestAbove.y - 17) + ')',
+  'enemy jumped exactly ONE level up to nearest (baseY ' + beforeY + ' -> ' + e2.baseY + ', target ' + (nearestAbove.y - 17) + ')',
   'wrong jump height (baseY ' + e2.baseY + ', expected ' + (nearestAbove.y - 17) + ')');
 
 // ---- Test 3: 0.6s stop before jump — setting _jumpStop=36 makes the enemy
