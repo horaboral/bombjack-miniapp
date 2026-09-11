@@ -62,7 +62,7 @@ S.G.freeze = 0;
 console.log('\n[Test 1: Jump is strictly vertical]');
 {
   S.G.enemies = [];
-  const e = S.spawnEnemy(null);
+  const e = S.spawnEnemy('owl'); // fly type, offset 17
   // force onto middle platform (y=168, w=46 at x=40)
   e.x = 60; e.baseY = 168 - 17; e.surf = 'plat'; e.minX = 41; e.maxX = 85; e.y = e.baseY; e.vy = 0;
   S.G.enemies.push(e);
@@ -137,9 +137,16 @@ console.log('\n[Test 5: Mini landing offset (fly=17, non-fly=8)]');
   const mini = S.G.enemies[0];
   for (let i = 0; i < 300; i++) { S.enemyStep(); if (!mini.dropping) break; }
   if (!mini.dropping) {
-    const surfY = S.surfaceAtX(mini.x);
-    const expectedY = surfY - 17; // roach is fly type
-    check('roach mini at surfY-17 (y=' + mini.y.toFixed(1) + ' expected ' + expectedY.toFixed(1) + ')', Math.abs(mini.y - expectedY) < 2);
+    // mini should land on the first platform BELOW its spawn position
+    // (not the highest platform under x, which might be above the spawn)
+    const spawnY = mini._dropFrom;
+    let expectedSurf = S.CFG.GROUND_Y;
+    for (const pl of S.G.plat) {
+      if (pl.y <= spawnY) continue;
+      if (mini.x > pl.x && mini.x < pl.x + pl.w && pl.y < expectedSurf) expectedSurf = pl.y;
+    }
+    const expectedY = expectedSurf - 17; // roach is fly type
+    check('roach mini lands below spawn (y=' + mini.y.toFixed(1) + ' expected ' + expectedY.toFixed(1) + ', spawn=' + spawnY.toFixed(1) + ')', Math.abs(mini.y - expectedY) < 2);
   } else {
     check('mini landed (still dropping after 300 frames, y=' + mini.y + ')', false);
   }

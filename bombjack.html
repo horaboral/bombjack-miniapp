@@ -247,7 +247,8 @@ function spawnMiniBoss(b) {
     x, y: b.y + b.bh * 0.45, // in front of (just below) the boss's center
     vy: 0,
     surf: 'ground', minX: 8, maxX: CFG.W - 8,
-    baseY: surfY - 8, // lands on the highest surface under its x
+    baseY: surfY - 8,
+    _dropFrom: b.y + b.bh * 0.45, // spawn y — only land on surfaces below this
   };
   G.enemies.push(e);
 }
@@ -694,11 +695,15 @@ function enemyBox(e) {
 //    it could walk). Never jumps 2+ levels. The other 50% stays put.
 function nextPlatformAbove(e) {
   // find the NEXT (closest) platform ABOVE e's current surface — only 1 level up
-  const curTop = e.surf === 'ground' ? CFG.GROUND_Y : e.baseY + 17;
+  // the platform must overlap in x with the enemy's current position
+  const flyOff = (e.type === 'owl' || e.type === 'ghost' || e.type === 'roach' || e.type === 'gorilla') ? 17 : 8;
+  const curTop = e.surf === 'ground' ? CFG.GROUND_Y : e.baseY + flyOff;
   let best = null;
   for (const pl of G.plat) {
     if (pl.y + 17 >= curTop - 2) continue;      // must be higher (smaller y)
     if (pl.w < 22) continue;                    // needs room to walk
+    // must overlap in x: the enemy's x is within the platform's range
+    if (e.x < pl.x || e.x >= pl.x + pl.w) continue;
     // prefer the one closest above: largest y that is still above curTop
     if (!best || pl.y > best.y) best = pl;
   }
@@ -718,16 +723,16 @@ function stepEnemyWalk(e) {
   }
   if (e.jumpCd <= 0) {
     e.jumpCd = 600; // reset regardless of outcome
-    // 50% chance to jump, 50% stay on same platform
-    if (Math.random() < 0.5) {
+    // enemies on the ground climb more eagerly (80%), others 50%
+    const jumpChance = (e.surf === 'ground') ? 0.8 : 0.5;
+    if (Math.random() < jumpChance) {
       const hp = nextPlatformAbove(e);
-      if (hp) {
-        // start the 0.6s stop, then execute the jump after it elapses
+      // only jump if the enemy's x is actually within the target platform's range
+      if (hp && e.x >= hp.x && e.x < hp.x + hp.w) {
         e._jumpStop = 36;
         e._jumpTarget = hp;
       }
     }
-    // no upper platform or 50% stayed — just keep walking
   }
   if (e._jumpTarget) {
     // strictly vertical jump: enemy stays at the same x, only moves up
@@ -735,7 +740,8 @@ function stepEnemyWalk(e) {
       e._jumpT = 0;
       e._jumpFromY = e.baseY;
       const hp = e._jumpTarget;
-      e._jumpToY = hp.y - 17;
+      const jumpFlyOff = (e.type === 'owl' || e.type === 'ghost' || e.type === 'roach' || e.type === 'gorilla') ? 17 : 8;
+      e._jumpToY = hp.y - jumpFlyOff;
       e._jumpPlat = hp;
     }
     e._jumpT++;
@@ -748,10 +754,9 @@ function stepEnemyWalk(e) {
     if (t >= 1) {
       e.surf = 'plat';
       const hp = e._jumpPlat;
-      // clamp x to the target platform's walkable range
-      e.x = Math.max(hp.x + 6, Math.min(hp.x + hp.w - 6, e.x));
       e.minX = hp.x + 6; e.maxX = hp.x + hp.w - 6;
-      e.baseY = hp.y - 17;
+      const flyOff = (e.type === 'owl' || e.type === 'ghost' || e.type === 'roach' || e.type === 'gorilla') ? 17 : 8;
+      e.baseY = hp.y - flyOff;
       e.y = e.baseY;
       e.vy = 0;
       e._jumpTarget = null; e._jumpPlat = null; e._jumpT = null;
@@ -759,6 +764,38 @@ function stepEnemyWalk(e) {
       return;
     }
     return; // in mid-air during jump arc
+  }
+
+  // ---- if already falling, just fall straight down (no walk, no x change) ----
+  if (e._fallFrom != null) {
+    e.vy = Math.min((e.vy == null ? 0 : e.vy) + 0.08, 1.2);
+    e.y += e.vy;
+    // find the highest platform BELOW the source that extends under the enemy's x
+    const srcPlatY = e._fallFrom;
+    let landY = CFG.GROUND_Y;
+    let landPlat = null;
+    for (const p2 of G.plat) {
+      if (p2.y <= srcPlatY) continue; // must be below the source (higher y)
+      if (e.x >= p2.x && e.x < p2.x + p2.w) {
+        if (p2.y < landY) { landY = p2.y; landPlat = p2; }
+      }
+    }
+    landY -= (isFly ? 17 : 8);
+    if (e.y >= landY) {
+      e.y = landY;
+      e.vy = 0;
+      e.baseY = landY;
+      e._fallFrom = null;
+      if (landPlat) {
+        e.surf = 'plat';
+        e.minX = landPlat.x + 6; e.maxX = landPlat.x + landPlat.w - 6;
+      } else {
+        e.surf = 'ground';
+        e.minX = 8; e.maxX = CFG.W - 8;
+      }
+    }
+    e.t++; e.wob += 0.15;
+    return;
   }
 
   // ---- horizontal walk with a little type flavor ----
@@ -776,53 +813,25 @@ function stepEnemyWalk(e) {
     if (e.x <= 8 && e.dir < 0) { e.x = 8; e.dir = 1; }
     else if (e.x >= CFG.W - 8 && e.dir > 0) { e.x = CFG.W - 8; e.dir = -1; }
   } else {
-    // platform tips: 50% turn back on same platform, 50% walk off and fall
-    // (keeping the same direction, continues on the platform below)
+    // platform tips: 85% turn back on same platform, 15% walk off and fall
     if (e.x <= e.minX && e.dir < 0) {
-      if (Math.random() < 0.5) { e.x = e.minX; e.dir = 1; }
+      if (Math.random() < 0.85) { e.x = e.minX; e.dir = 1; }
       else { e.x = e.minX - 1; } // step off the tip (keep dir)
     } else if (e.x >= e.maxX && e.dir > 0) {
-      if (Math.random() < 0.5) { e.x = e.maxX; e.dir = -1; }
+      if (Math.random() < 0.85) { e.x = e.maxX; e.dir = -1; }
       else { e.x = e.maxX + 1; } // step off the tip (keep dir)
     }
   }
 
-  // ---- vertical: sit on surface, or fall when off the edge ----
+  // ---- vertical: sit on surface, or start falling when off the edge ----
   const overEdge = (e.surf !== 'ground') &&
     ((e.x < e.minX) || (e.x > e.maxX));
   if (overEdge) {
-    // falling off a platform tip — land on the surface DIRECTLY BELOW the
-    // platform it fell from (next lower platform or ground)
-    if (e._fallFrom == null) e._fallFrom = e.baseY + 17;
-    e.vy = Math.min((e.vy == null ? 0 : e.vy) + 0.08, 1.2);
-    e.y += e.vy;
-    const srcTop = e._fallFrom;
-    let landY = CFG.GROUND_Y;
-    let landPlat = null;
-    for (const p2 of G.plat) {
-      if (p2.y >= srcTop - 1) continue; // must be below the source
-      // strict x-range: the platform must actually extend under the enemy's x
-      if (e.x >= p2.x && e.x < p2.x + p2.w) {
-        if (p2.y < landY) { landY = p2.y; landPlat = p2; }
-      }
-    }
-    landY -= (isFly ? 17 : 8);
-    if (e.y >= landY) {
-      e.y = landY;
-      e.vy = 0;
-      e.baseY = landY;
-      e._fallFrom = null;
-      if (landPlat) {
-        e.surf = 'plat';
-        e.minX = landPlat.x + 6; e.maxX = landPlat.x + landPlat.w - 6;
-        // keep the same direction — continue walking on the platform below
-      } else {
-        e.surf = 'ground';
-        e.minX = 8; e.maxX = CFG.W - 8;
-      }
-    }
+    // stepping off a platform tip — start the fall (next frame the
+    // early-return block handles the actual falling)
+    if (e._fallFrom == null) e._fallFrom = e.baseY + (isFly ? 17 : 8);
+    e.vy = 0;
   } else {
-    e._fallFrom = null;
     e.y = e.baseY + (isFly ? Math.sin(e.t * 0.08) * 2 : -Math.abs(Math.sin(e.t * 0.2)) * hop);
   }
 }
@@ -852,7 +861,12 @@ function enemyStep() {
       e.miniT++;
       e.vy = Math.min(e.vy + 0.08, 1.2);
       e.y += e.vy;
-      const surfY = surfaceAtX(e.x);
+      // find the highest surface BELOW the spawn position
+      let surfY = CFG.GROUND_Y;
+      for (const pl of G.plat) {
+        if (pl.y <= (e._dropFrom || 0)) continue; // must be below spawn
+        if (e.x > pl.x && e.x < pl.x + pl.w && pl.y < surfY) surfY = pl.y;
+      }
       const flyOff = (e.type === 'owl' || e.type === 'ghost' || e.type === 'roach' || e.type === 'gorilla') ? 17 : 8;
       if (e.y >= surfY - flyOff) {
         e.y = surfY - flyOff;

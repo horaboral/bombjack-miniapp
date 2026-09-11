@@ -89,32 +89,32 @@ check(nearestAbove !== topPlat || S.G.plat.length <= 2,
   'nearest-above picked the topmost platform (old bug)');
 const e2 = S.spawnEnemy('cat');
 e2.surf = 'plat'; e2.minX = lowest.x + 6; e2.maxX = lowest.x + lowest.w - 6;
-e2.baseY = lowest.y - 17; e2.y = e2.baseY; e2.x = lowest.x + lowest.w / 2; e2.dir = 1;
+e2.baseY = lowest.y - 8; e2.y = e2.baseY; e2.x = lowest.x + lowest.w / 2; e2.dir = 1;
 e2._jumpTarget = nearestAbove; // force: jump immediately (no stop)
 const beforeY = e2.baseY;
 // run 35 frames: 30-frame jump arc + a few walking frames
 for (let f = 0; f < 35; f++) S.stepEnemyWalk(e2);
-check(Math.abs(e2.baseY - (nearestAbove.y - 17)) < 1,
-  'enemy jumped ONE level up to nearest (baseY ' + beforeY + ' -> ' + e2.baseY + ', target ' + (nearestAbove.y - 17) + ')',
-  'wrong jump height (baseY ' + e2.baseY + ', expected ' + (nearestAbove.y - 17) + ')');
+check(Math.abs(e2.baseY - (nearestAbove.y - 8)) < 1,
+  'enemy jumped ONE level up to nearest (baseY ' + beforeY + ' -> ' + e2.baseY + ', target ' + (nearestAbove.y - 8) + ')',
+  'wrong jump height (baseY ' + e2.baseY + ', expected ' + (nearestAbove.y - 8) + ')');
 
 // ---- Test 3: 0.6s stop before jump — setting _jumpStop=36 makes the enemy
 // not move (no x change) for 36 frames, then jump.
 const e3 = S.spawnEnemy('cat');
 e3.surf = 'plat'; e3.minX = lowest.x + 6; e3.maxX = lowest.x + lowest.w - 6;
-e3.baseY = lowest.y - 17; e3.y = e3.baseY; e3.x = lowest.x + lowest.w / 2; e3.dir = 1;
+e3.baseY = lowest.y - 8; e3.y = e3.baseY; e3.x = lowest.x + lowest.w / 2; e3.dir = 1; // cat is non-fly, offset 8
 e3._jumpStop = 36; e3._jumpTarget = nearestAbove;
 const x0 = e3.x;
 // run 20 frames: should NOT have moved (still in 0.6s stop)
 for (let f = 0; f < 20; f++) S.stepEnemyWalk(e3);
-check(e3.x === x0 && e3.baseY === lowest.y - 17,
+check(e3.x === x0 && e3.baseY === lowest.y - 8,
   'during 0.6s stop: enemy does not move (x=' + e3.x + ', baseY=' + e3.baseY + ')',
   'enemy moved during stop: x ' + x0 + ' -> ' + e3.x + ', baseY ' + e3.baseY);
 // run 70 more frames: stop expires (16 left) + 30-frame jump arc + walking
 for (let f = 0; f < 70; f++) S.stepEnemyWalk(e3);
-check(e3.baseY === nearestAbove.y - 17,
-  'after 0.6s stop + arc: enemy on upper platform (baseY ' + e3.baseY + ')',
-  'enemy did not reach upper platform (baseY ' + e3.baseY + ')');
+check(Math.abs(e3.baseY - (nearestAbove.y - 8)) < 1,
+  'after 0.6s stop + arc: enemy on upper platform (baseY ' + e3.baseY + ', expected ' + (nearestAbove.y - 8) + ')',
+  'enemy did not reach upper platform (baseY ' + e3.baseY + ', expected ' + (nearestAbove.y - 8) + ')');
 
 // ---- Test 4: freeze end un-coins minis (body back) ----
 S.P.dead = false; // restore for boss tests below
