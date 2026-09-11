@@ -579,16 +579,22 @@ function roundClear() {
 // ================= POWERUPS ====================================================
 function spawnPowerup() {
   const r = Math.random();
-  const L = r < 0.34 ? 'P' : r < 0.62 ? 'B' : r < 0.86 ? 'E' : 'S';
-  G.powerups.push({ x: 6 + Math.random() * (CFG.W - 12), y: 30 + Math.random() * 70, L, vx: 0.35, t: 0 });
+  const L = r < 0.45 ? 'P' : r < 0.65 ? 'B' : r < 0.85 ? 'E' : 'S';
+  // spawn with a random 45deg diagonal direction (bounce off external borders)
+  const dir = Math.floor(Math.random() * 4); // 0=TR, 1=BR, 2=BL, 3=TL
+  const sp = 0.5;
+  const vx = (dir & 1) ? sp : -sp;
+  const vy = (dir & 2) ? sp : -sp;
+  G.powerups.push({ x: 6 + Math.random() * (CFG.W - 12), y: 30 + Math.random() * 70, L, vx, vy, t: 0 });
 }
 function powerupStep() {
   for (const pu of G.powerups) {
-    pu.t++; pu.x += pu.vx;
+    pu.t++; pu.x += pu.vx; pu.y += pu.vy;
+    // bounce off EXTERNAL borders only (left/right walls + top HUD + ground)
     if (pu.x > CFG.W - 8) { pu.x = CFG.W - 8; pu.vx *= -1; }
     if (pu.x < 8) { pu.x = 8; pu.vx *= -1; }
-    if (pu.y < 28) pu.y = 28;
-    if (pu.y > CFG.GROUND_Y - 8) pu.y = CFG.GROUND_Y - 8;
+    if (pu.y < 28) { pu.y = 28; pu.vy *= -1; }
+    if (pu.y > CFG.GROUND_Y - 8) { pu.y = CFG.GROUND_Y - 8; pu.vy *= -1; }
     if (pu.t > 900) pu.dead = true;
     if (!pu.dead && !P.dead &&
         rectHit({ x: P.x, y: P.y, w: CFG.PLAYER_W, h: CFG.PLAYER_H }, { x: pu.x - 7, y: pu.y - 7, w: 14, h: 14 })) {
