@@ -730,42 +730,35 @@ function stepEnemyWalk(e) {
     // no upper platform or 50% stayed — just keep walking
   }
   if (e._jumpTarget) {
-    // animate a short arc up to the target platform (~20 frames)
+    // strictly vertical jump: enemy stays at the same x, only moves up
     if (e._jumpT == null) {
       e._jumpT = 0;
-      e._jumpFromX = e.x;
       e._jumpFromY = e.baseY;
       const hp = e._jumpTarget;
-      const cx = hp.x + hp.w / 2;
-      e._jumpToX = Math.max(hp.x + 6, Math.min(hp.x + hp.w - 6, cx + (Math.random() < 0.5 ? -1 : 1) * (hp.w * 0.25)));
       e._jumpToY = hp.y - 17;
       e._jumpPlat = hp;
     }
     e._jumpT++;
-    const total = 20;
+    const total = 30; // 0.5s — slow enough to see clearly
     const t = Math.min(1, e._jumpT / total);
-    // ease-out: fast start, gentle landing
     const ease = 1 - (1 - t) * (1 - t);
-    e.x = e._jumpFromX + (e._jumpToX - e._jumpFromX) * ease;
+    // x stays fixed (strictly vertical)
     e.baseY = e._jumpFromY + (e._jumpToY - e._jumpFromY) * ease;
-    // little arc: rise slightly above the target, then settle
-    const arcH = 4;
-    e.y = e.baseY - Math.sin(t * Math.PI) * arcH;
+    e.y = e.baseY - Math.sin(t * Math.PI) * 3;
     if (t >= 1) {
-      // landed
       e.surf = 'plat';
       const hp = e._jumpPlat;
+      // clamp x to the target platform's walkable range
+      e.x = Math.max(hp.x + 6, Math.min(hp.x + hp.w - 6, e.x));
       e.minX = hp.x + 6; e.maxX = hp.x + hp.w - 6;
       e.baseY = hp.y - 17;
       e.y = e.baseY;
-      e.dir = e.x < (hp.x + hp.w / 2) ? 1 : -1;
       e.vy = 0;
       e._jumpTarget = null; e._jumpPlat = null; e._jumpT = null;
-      e._jumpFromX = null; e._jumpFromY = null; e._jumpToX = null; e._jumpToY = null;
       e._fallFrom = null;
       return;
     }
-    return; // in mid-air during jump arc — skip normal walk
+    return; // in mid-air during jump arc
   }
 
   // ---- horizontal walk with a little type flavor ----
@@ -801,7 +794,7 @@ function stepEnemyWalk(e) {
     // falling off a platform tip — land on the surface DIRECTLY BELOW the
     // platform it fell from (next lower platform or ground)
     if (e._fallFrom == null) e._fallFrom = e.baseY + 17;
-    e.vy = Math.min((e.vy == null ? 0 : e.vy) + 0.15, 2.5);
+    e.vy = Math.min((e.vy == null ? 0 : e.vy) + 0.08, 1.2);
     e.y += e.vy;
     const srcTop = e._fallFrom;
     let landY = CFG.GROUND_Y;
@@ -830,7 +823,7 @@ function stepEnemyWalk(e) {
     }
   } else {
     e._fallFrom = null;
-    e.y = e.baseY + (isFly ? Math.sin(e.t * 0.08 + e.phase) * 3 : -Math.abs(Math.sin(e.t * 0.2)) * hop);
+    e.y = e.baseY + (isFly ? Math.sin(e.t * 0.08) * 2 : -Math.abs(Math.sin(e.t * 0.2)) * hop);
   }
 }
 function enemyStep() {
@@ -857,12 +850,13 @@ function enemyStep() {
     // SOLID — it lands on the first surface under it and stops.
     if (e.mini && e.dropping) {
       e.miniT++;
-      e.vy = Math.min(e.vy + CFG.GRAV, 2.5);
+      e.vy = Math.min(e.vy + 0.08, 1.2);
       e.y += e.vy;
       const surfY = surfaceAtX(e.x);
-      if (e.y >= surfY - 8) {
-        e.y = surfY - 8;
-        e.baseY = surfY - 8;
+      const flyOff = (e.type === 'owl' || e.type === 'ghost' || e.type === 'roach' || e.type === 'gorilla') ? 17 : 8;
+      if (e.y >= surfY - flyOff) {
+        e.y = surfY - flyOff;
+        e.baseY = surfY - flyOff;
         e.dropping = false;
         e.vy = 0;
         // adopt the surface it actually landed on (a platform, or the ground)

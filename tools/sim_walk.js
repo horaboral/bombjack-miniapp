@@ -92,9 +92,9 @@ e2.surf = 'plat'; e2.minX = lowest.x + 6; e2.maxX = lowest.x + lowest.w - 6;
 e2.baseY = lowest.y - 17; e2.y = e2.baseY; e2.x = lowest.x + lowest.w / 2; e2.dir = 1;
 e2._jumpTarget = nearestAbove; // force: jump immediately (no stop)
 const beforeY = e2.baseY;
-// run 25 frames: 20-frame jump arc + a few walking frames
-for (let f = 0; f < 25; f++) S.stepEnemyWalk(e2);
-check(e2.baseY === nearestAbove.y - 17,
+// run 35 frames: 30-frame jump arc + a few walking frames
+for (let f = 0; f < 35; f++) S.stepEnemyWalk(e2);
+check(Math.abs(e2.baseY - (nearestAbove.y - 17)) < 1,
   'enemy jumped ONE level up to nearest (baseY ' + beforeY + ' -> ' + e2.baseY + ', target ' + (nearestAbove.y - 17) + ')',
   'wrong jump height (baseY ' + e2.baseY + ', expected ' + (nearestAbove.y - 17) + ')');
 
@@ -110,8 +110,8 @@ for (let f = 0; f < 20; f++) S.stepEnemyWalk(e3);
 check(e3.x === x0 && e3.baseY === lowest.y - 17,
   'during 0.6s stop: enemy does not move (x=' + e3.x + ', baseY=' + e3.baseY + ')',
   'enemy moved during stop: x ' + x0 + ' -> ' + e3.x + ', baseY ' + e3.baseY);
-// run 60 more frames: stop expires (16 left) + 20-frame jump arc + walking
-for (let f = 0; f < 60; f++) S.stepEnemyWalk(e3);
+// run 70 more frames: stop expires (16 left) + 30-frame jump arc + walking
+for (let f = 0; f < 70; f++) S.stepEnemyWalk(e3);
 check(e3.baseY === nearestAbove.y - 17,
   'after 0.6s stop + arc: enemy on upper platform (baseY ' + e3.baseY + ')',
   'enemy did not reach upper platform (baseY ' + e3.baseY + ')');

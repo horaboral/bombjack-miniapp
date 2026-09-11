@@ -107,9 +107,10 @@ if (S.G.boss) {
   const startY = mini.y;
   for (let f = 0; f < 300 && mini.dropping; f++) S.enemyStep();
   const surfY = S.surfaceAtX(mini.x);
-  check(!mini.dropping && Math.abs(mini.y - (surfY - 8)) < 1.5,
-    'mini landed on solid surface at y=' + mini.y.toFixed(1) + ' (surface=' + surfY + ', fell ' + (mini.y - startY).toFixed(1) + 'px)',
-    'mini did not land correctly (dropping=' + mini.dropping + ', y=' + mini.y.toFixed(1) + ')');
+  const flyOff = (mini.type === 'owl' || mini.type === 'ghost' || mini.type === 'roach' || mini.type === 'gorilla') ? 17 : 8;
+  check(!mini.dropping && Math.abs(mini.y - (surfY - flyOff)) < 1.5,
+    'mini landed on solid surface at y=' + mini.y.toFixed(1) + ' (surface=' + surfY + ', offset=' + flyOff + ', fell ' + (mini.y - startY).toFixed(1) + 'px)',
+    'mini did not land correctly (dropping=' + mini.dropping + ', y=' + mini.y.toFixed(1) + ', expected ' + (surfY - flyOff) + ')');
 }
 
 // ---- Test 4: without P the boss KILLS the player; with P it takes damage ----
