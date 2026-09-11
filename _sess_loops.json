@@ -1,0 +1,211 @@
+{
+  "1956f448-8ed9-4563-9afe-96d347dd4cb0": {
+    "runs": [],
+    "errRetryCount": 0,
+    "errRetry": []
+  },
+  "83d9e602-3b63-44ca-ac21-283fbdc7b0ee": {
+    "runs": [],
+    "errRetryCount": 0,
+    "errRetry": []
+  },
+  "e4a40a89-746b-4e5c-a433-a95d8ef7eb5c": {
+    "runs": [],
+    "errRetryCount": 0,
+    "errRetry": []
+  },
+  "session-030c0467-cde4-4ab2-b76e-3a64b21beb8a": {
+    "runs": [
+      {
+        "tool": "pwsh",
+        "sig": "Set-Location 'D:\\dsh workspace\\dsh test project'\n$cred = Get-Content .creds.json -Raw | ConvertFrom-Json\n$pat = $cred.github_pat\n$H = @{ Authorization = \"Bearer $pat\"; Accept = \"application/vnd.github",
+        "n": 7
+      },
+      {
+        "tool": "job_output",
+        "sig": "",
+        "n": 3
+      },
+      {
+        "tool": "edit",
+        "sig": "file_path=D:\\dsh workspace\\dsh test project\\bombjack.html",
+        "n": 8
+      },
+      {
+        "tool": "edit",
+        "sig": "file_path=D:\\dsh workspace\\dsh test project\\bombjack.html",
+        "n": 5
+      },
+      {
+        "tool": "pwsh",
+        "sig": "Set-Location 'D:\\dsh workspace\\dsh test project'\n$dbg = @'\nconst fs=require('fs'),html=fs.readFileSync(__dirname+'/bombjack.html','utf8');\nconst blocks=[...html.matchAll(/<script>([\\s\\S]*?)<\\/script>/",
+        "n": 3
+      },
+      {
+        "tool": "pwsh",
+        "sig": "Set-Location 'D:\\dsh workspace\\dsh test project'\n$dbg = @'\nconst fs=require('fs'),html=fs.readFileSync(__dirname+'/bombjack.html','utf8');\nconst blocks=[...html.matchAll(/<script>([\\s\\S]*?)<\\/script>/",
+        "n": 3
+      },
+      {
+        "tool": "edit",
+        "sig": "file_path=D:\\dsh workspace\\dsh test project\\bombjack.html",
+        "n": 5
+      },
+      {
+        "tool": "edit",
+        "sig": "file_path=D:\\dsh\\repos\\memory-palace\\dsh-plugin\\src\\spawn.ts",
+        "n": 3
+      },
+      {
+        "tool": "edit",
+        "sig": "file_path=D:\\dsh\\repos\\memory-palace\\feed-palace.py",
+        "n": 4
+      }
+    ],
+    "errRetryCount": 1,
+    "errRetry": [
+      {
+        "tool": "grep",
+        "err": "Error: tool call timed out after 30000ms "
+      }
+    ]
+  },
+  "session-4419aa77-a210-4864-956c-0b654597704a": {
+    "runs": [
+      {
+        "tool": "write",
+        "sig": "file_path=C:\\Users\\gru\\AppData\\Local\\Temp\\dzn\\dxcore_test.c",
+        "n": 3
+      },
+      {
+        "tool": "edit",
+        "sig": "file_path=D:\\dsh\\repos\\memory-palace\\src\\eventmem\\consolidate.py",
+        "n": 7
+      },
+      {
+        "tool": "edit",
+        "sig": "file_path=D:\\dsh\\repos\\memory-palace\\src\\eventmem\\consolidate.py",
+        "n": 9
+      },
+      {
+        "tool": "write",
+        "sig": "file_path=C:\\Users\\gru\\AppData\\Local\\Temp\\dzn\\hresult_test.c",
+        "n": 3
+      },
+      {
+        "tool": "edit",
+        "sig": "file_path=D:\\dsh workspace\\dsh test project\\bombjack.html",
+        "n": 3
+      },
+      {
+        "tool": "edit",
+        "sig": "file_path=D:\\dsh\\repos\\memory-palace\\anthropic_shim.py",
+        "n": 3
+      },
+      {
+        "tool": "pwsh",
+        "sig": "$env:PYTHONIOENCODING='utf-8'\n$env:EVENTMEM_BASE_URL='http://127.0.0.1:8021'\n$env:EVENTMEM_API_KEY='local-poc'\n$env:EVENTMEM_MODEL='Qwen3.5-4B-Q4_K_M.gguf'\n$env:EVENTMEM_TIMEOUT_S='300'\ncd \"D:\\dsh wor",
+        "n": 4
+      },
+      {
+        "tool": "pwsh",
+        "sig": "$env:PYTHONIOENCODING='utf-8'\n$env:EVENTMEM_BASE_URL='http://127.0.0.1:8021'\n$env:EVENTMEM_API_KEY='local-poc'\n$env:EVENTMEM_MODEL='Qwen3.5-4B-Q4_K_M.gguf'\n$env:EVENTMEM_TIMEOUT_S='300'\ncd \"D:\\dsh wor",
+        "n": 3
+      },
+      {
+        "tool": "edit",
+        "sig": "file_path=D:\\dsh workspace\\dsh test project\\bombjack.html",
+        "n": 3
+      },
+      {
+        "tool": "edit",
+        "sig": "file_path=D:\\dsh workspace\\dsh test project\\bombjack.html",
+        "n": 3
+      },
+      {
+        "tool": "pwsh",
+        "sig": "$edge = \"C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe\"; $out = & $edge --headless=new --disable-gpu --virtual-time-budget=3000 --dump-dom \"file:///D:/dsh workspace/dsh test project/ref",
+        "n": 3
+      },
+      {
+        "tool": "edit",
+        "sig": "file_path=D:\\dsh workspace\\dsh test project\\bombjack.html",
+        "n": 3
+      },
+      {
+        "tool": "edit",
+        "sig": "file_path=D:\\dsh workspace\\dsh test project\\bombjack.html",
+        "n": 6
+      },
+      {
+        "tool": "edit",
+        "sig": "file_path=D:\\dsh workspace\\dsh test project\\bombjack.html",
+        "n": 5
+      },
+      {
+        "tool": "edit",
+        "sig": "file_path=D:\\dsh workspace\\dsh test project\\bombjack.html",
+        "n": 4
+      },
+      {
+        "tool": "edit",
+        "sig": "file_path=D:\\dsh workspace\\dsh test project\\bombjack.html",
+        "n": 3
+      },
+      {
+        "tool": "edit",
+        "sig": "file_path=D:\\dsh workspace\\dsh test project\\bombjack.html",
+        "n": 11
+      }
+    ],
+    "errRetryCount": 1,
+    "errRetry": [
+      {
+        "tool": "grep",
+        "err": "Error: tool call timed out after 30000ms "
+      }
+    ]
+  },
+  "session-59142530-2890-46d9-9fa1-bac8c07a18af": {
+    "runs": [],
+    "errRetryCount": 0,
+    "errRetry": []
+  },
+  "session-c32f5103-a8e0-4c49-bdf7-03dfb63738ae": {
+    "runs": [
+      {
+        "tool": "edit",
+        "sig": "file_path=C:\\Users\\gru\\.dsh\\make-handoff.mjs",
+        "n": 4
+      }
+    ],
+    "errRetryCount": 0,
+    "errRetry": []
+  },
+  "session-c816bc81-19cd-4f29-80a7-f60b6897970a": {
+    "runs": [
+      {
+        "tool": "write",
+        "sig": "file_path=D:\\dsh workspace\\dsh test project\\throughput.py",
+        "n": 3
+      },
+      {
+        "tool": "edit",
+        "sig": "file_path=C:\\Users\\gru\\.dsh\\settings.yaml",
+        "n": 3
+      },
+      {
+        "tool": "edit",
+        "sig": "file_path=D:\\dsh workspace\\dsh test project\\PROGRESS.md",
+        "n": 6
+      }
+    ],
+    "errRetryCount": 1,
+    "errRetry": [
+      {
+        "tool": "grep",
+        "err": "Error: cannot read \"D:\\dsh workspace\\dsh test project\\research\\refs\\wiki-3.png\" as an image: model \"qwen38\" does not declare image input; switch to an image-cap"
+      }
+    ]
+  }
+}

@@ -1,0 +1,806 @@
+{
+  "perSession": {
+    "1956f448-8ed9-4563-9afe-96d347dd4cb0": {
+      "toolCalls": 35,
+      "toolErrors": 1,
+      "steps": 36,
+      "userMsgs": 2,
+      "llmRetries": 1,
+      "compactions": 0,
+      "approvals": 0,
+      "byTool": {
+        "pwsh": 21,
+        "write": 8,
+        "edit": 4,
+        "web_search": 1,
+        "report": 1
+      },
+      "errByTool": {
+        "web_search": 1
+      },
+      "repeatPairs": [
+        {
+          "name": "pwsh",
+          "args": "[object Object]"
+        }
+      ],
+      "turns": 1,
+      "firstTime": 1788111550745,
+      "lastTime": 1788113927864,
+      "errorSamples": [
+        {
+          "tool": "web_search",
+          "text": "Error: Insufficient Balance "
+        }
+      ],
+      "durationMin": 40
+    },
+    "83d9e602-3b63-44ca-ac21-283fbdc7b0ee": {
+      "toolCalls": 7,
+      "toolErrors": 0,
+      "steps": 8,
+      "userMsgs": 2,
+      "llmRetries": 0,
+      "compactions": 0,
+      "approvals": 0,
+      "byTool": {
+        "read": 1,
+        "write": 1,
+        "pwsh": 4,
+        "report": 1
+      },
+      "errByTool": {},
+      "repeatPairs": [],
+      "turns": 1,
+      "firstTime": 1788037824478,
+      "lastTime": 1788038795038,
+      "errorSamples": [],
+      "durationMin": 16
+    },
+    "e4a40a89-746b-4e5c-a433-a95d8ef7eb5c": {
+      "toolCalls": 0,
+      "toolErrors": 0,
+      "steps": 1,
+      "userMsgs": 2,
+      "llmRetries": 0,
+      "compactions": 0,
+      "approvals": 0,
+      "byTool": {},
+      "errByTool": {},
+      "repeatPairs": [],
+      "turns": 1,
+      "firstTime": 1788111550745,
+      "lastTime": 1788111785717,
+      "errorSamples": [],
+      "durationMin": 4
+    },
+    "session-030c0467-cde4-4ab2-b76e-3a64b21beb8a": {
+      "toolCalls": 629,
+      "toolErrors": 24,
+      "steps": 626,
+      "userMsgs": 59,
+      "llmRetries": 10,
+      "compactions": 11,
+      "approvals": 0,
+      "byTool": {
+        "read": 140,
+        "grep": 49,
+        "todo_write": 26,
+        "pwsh": 262,
+        "edit": 76,
+        "write": 27,
+        "job_output": 13,
+        "job_kill": 1,
+        "web_search": 7,
+        "ask_user_question": 7,
+        "subagent": 3,
+        "job_list": 1,
+        "read_image": 11,
+        "glob": 5,
+        "exit_plan_mode": 1
+      },
+      "errByTool": {
+        "web_search": 6,
+        "write": 2,
+        "edit": 9,
+        "read_image": 5,
+        "exit_plan_mode": 1,
+        "grep": 1
+      },
+      "repeatPairs": [
+        {
+          "name": "read",
+          "args": "[object Object]"
+        },
+        {
+          "name": "pwsh",
+          "args": "[object Object]"
+        },
+        {
+          "name": "pwsh",
+          "args": "[object Object]"
+        },
+        {
+          "name": "pwsh",
+          "args": "[object Object]"
+        },
+        {
+          "name": "pwsh",
+          "args": "[object Object]"
+        },
+        {
+          "name": "pwsh",
+          "args": "[object Object]"
+        },
+        {
+          "name": "pwsh",
+          "args": "[object Object]"
+        },
+        {
+          "name": "pwsh",
+          "args": "[object Object]"
+        },
+        {
+          "name": "pwsh",
+          "args": "[object Object]"
+        },
+        {
+          "name": "edit",
+          "args": "[object Object]"
+        },
+        {
+          "name": "edit",
+          "args": "[object Object]"
+        },
+        {
+          "name": "pwsh",
+          "args": "[object Object]"
+        },
+        {
+          "name": "pwsh",
+          "args": "[object Object]"
+        },
+        {
+          "name": "pwsh",
+          "args": "[object Object]"
+        },
+        {
+          "name": "pwsh",
+          "args": "[object Object]"
+        },
+        {
+          "name": "pwsh",
+          "args": "[object Object]"
+        },
+        {
+          "name": "pwsh",
+          "args": "[object Object]"
+        },
+        {
+          "name": "pwsh",
+          "args": "[object Object]"
+        },
+        {
+          "name": "pwsh",
+          "args": "[object Object]"
+        },
+        {
+          "name": "edit",
+          "args": "[object Object]"
+        },
+        {
+          "name": "edit",
+          "args": "[object Object]"
+        },
+        {
+          "name": "pwsh",
+          "args": "[object Object]"
+        },
+        {
+          "name": "read",
+          "args": "[object Object]"
+        },
+        {
+          "name": "read",
+          "args": "[object Object]"
+        },
+        {
+          "name": "read",
+          "args": "[object Object]"
+        },
+        {
+          "name": "job_output",
+          "args": "[object Object]"
+        },
+        {
+          "name": "pwsh",
+          "args": "[object Object]"
+        },
+        {
+          "name": "pwsh",
+          "args": "[object Object]"
+        },
+        {
+          "name": "pwsh",
+          "args": "[object Object]"
+        },
+        {
+          "name": "pwsh",
+          "args": "[object Object]"
+        }
+      ],
+      "turns": 26,
+      "firstTime": 1787949121315,
+      "lastTime": 1788210576568,
+      "errorSamples": [
+        {
+          "tool": "web_search",
+          "text": "Error: Insufficient Balance "
+        },
+        {
+          "tool": "write",
+          "text": "Error: cannot write \"D:\\dsh workspace\\dsh test project\\smoke.js\": file no longer exists — re-read the file, then retry "
+        },
+        {
+          "tool": "write",
+          "text": "Error: cannot write \"D:\\dsh workspace\\dsh test project\\smoke.js\": file no longer exists — re-read the file, then retry "
+        },
+        {
+          "tool": "edit",
+          "text": "Error: old_string was not found in \"D:\\dsh workspace\\dsh test project\\PROGRESS.md\" "
+        },
+        {
+          "tool": "edit",
+          "text": "Error: old_string was not found in \"D:\\dsh workspace\\dsh test project\\bombjack.html\" "
+        },
+        {
+          "tool": "edit",
+          "text": "Error: old_string was not found in \"D:\\dsh workspace\\dsh test project\\PROGRESS.md\" "
+        },
+        {
+          "tool": "web_search",
+          "text": "Error: Insufficient Balance "
+        },
+        {
+          "tool": "edit",
+          "text": "Error: edit requires reading \"D:\\dsh workspace\\dsh test project\\bombjack.html\" first — read the file, then retry "
+        },
+        {
+          "tool": "edit",
+          "text": "Error: edit requires reading \"D:\\dsh workspace\\dsh test project\\PROGRESS.md\" first — read the file, then retry "
+        },
+        {
+          "tool": "web_search",
+          "text": "Error: Insufficient Balance "
+        },
+        {
+          "tool": "read_image",
+          "text": "Error: cannot read \"D:\\dsh workspace\\dsh test project\\refs\\pyramid2.jpg\": not found "
+        },
+        {
+          "tool": "read_image",
+          "text": "Error: cannot read \"D:\\dsh workspace\\dsh test project\\refs\\greek.jpg\": not found "
+        }
+      ],
+      "durationMin": 4358
+    },
+    "session-4419aa77-a210-4864-956c-0b654597704a": {
+      "toolCalls": 1528,
+      "toolErrors": 11,
+      "steps": 1534,
+      "userMsgs": 118,
+      "llmRetries": 35,
+      "compactions": 28,
+      "approvals": 0,
+      "byTool": {
+        "todo_write": 30,
+        "grep": 128,
+        "read": 205,
+        "pwsh": 639,
+        "edit": 173,
+        "ask_user_question": 8,
+        "glob": 14,
+        "write": 216,
+        "web_search": 40,
+        "update_goal": 1,
+        "job_kill": 2,
+        "job_output": 45,
+        "read_image": 27
+      },
+      "errByTool": {
+        "update_goal": 1,
+        "grep": 2,
+        "edit": 7,
+        "read": 1
+      },
+      "repeatPairs": [
+        {
+          "name": "read",
+          "args": "[object Object]"
+        },
+        {
+          "name": "read",
+          "args": "[object Object]"
+        },
+        {
+          "name": "edit",
+          "args": "[object Object]"
+        },
+        {
+          "name": "pwsh",
+          "args": "[object Object]"
+        },
+        {
+          "name": "read",
+          "args": "[object Object]"
+        },
+        {
+          "name": "pwsh",
+          "args": "[object Object]"
+        },
+        {
+          "name": "pwsh",
+          "args": "[object Object]"
+        },
+        {
+          "name": "pwsh",
+          "args": "[object Object]"
+        },
+        {
+          "name": "read",
+          "args": "[object Object]"
+        },
+        {
+          "name": "todo_write",
+          "args": "[object Object]"
+        },
+        {
+          "name": "read",
+          "args": "[object Object]"
+        },
+        {
+          "name": "read",
+          "args": "[object Object]"
+        },
+        {
+          "name": "pwsh",
+          "args": "[object Object]"
+        },
+        {
+          "name": "pwsh",
+          "args": "[object Object]"
+        },
+        {
+          "name": "pwsh",
+          "args": "[object Object]"
+        },
+        {
+          "name": "write",
+          "args": "[object Object]"
+        },
+        {
+          "name": "write",
+          "args": "[object Object]"
+        },
+        {
+          "name": "pwsh",
+          "args": "[object Object]"
+        },
+        {
+          "name": "pwsh",
+          "args": "[object Object]"
+        },
+        {
+          "name": "pwsh",
+          "args": "[object Object]"
+        },
+        {
+          "name": "pwsh",
+          "args": "[object Object]"
+        },
+        {
+          "name": "pwsh",
+          "args": "[object Object]"
+        },
+        {
+          "name": "pwsh",
+          "args": "[object Object]"
+        },
+        {
+          "name": "pwsh",
+          "args": "[object Object]"
+        },
+        {
+          "name": "write",
+          "args": "[object Object]"
+        },
+        {
+          "name": "pwsh",
+          "args": "[object Object]"
+        },
+        {
+          "name": "write",
+          "args": "[object Object]"
+        },
+        {
+          "name": "pwsh",
+          "args": "[object Object]"
+        },
+        {
+          "name": "pwsh",
+          "args": "[object Object]"
+        },
+        {
+          "name": "pwsh",
+          "args": "[object Object]"
+        },
+        {
+          "name": "pwsh",
+          "args": "[object Object]"
+        },
+        {
+          "name": "pwsh",
+          "args": "[object Object]"
+        },
+        {
+          "name": "pwsh",
+          "args": "[object Object]"
+        },
+        {
+          "name": "pwsh",
+          "args": "[object Object]"
+        },
+        {
+          "name": "pwsh",
+          "args": "[object Object]"
+        },
+        {
+          "name": "pwsh",
+          "args": "[object Object]"
+        },
+        {
+          "name": "pwsh",
+          "args": "[object Object]"
+        },
+        {
+          "name": "pwsh",
+          "args": "[object Object]"
+        },
+        {
+          "name": "pwsh",
+          "args": "[object Object]"
+        },
+        {
+          "name": "pwsh",
+          "args": "[object Object]"
+        },
+        {
+          "name": "pwsh",
+          "args": "[object Object]"
+        },
+        {
+          "name": "pwsh",
+          "args": "[object Object]"
+        },
+        {
+          "name": "pwsh",
+          "args": "[object Object]"
+        },
+        {
+          "name": "pwsh",
+          "args": "[object Object]"
+        },
+        {
+          "name": "pwsh",
+          "args": "[object Object]"
+        },
+        {
+          "name": "pwsh",
+          "args": "[object Object]"
+        },
+        {
+          "name": "pwsh",
+          "args": "[object Object]"
+        },
+        {
+          "name": "pwsh",
+          "args": "[object Object]"
+        },
+        {
+          "name": "pwsh",
+          "args": "[object Object]"
+        },
+        {
+          "name": "edit",
+          "args": "[object Object]"
+        },
+        {
+          "name": "edit",
+          "args": "[object Object]"
+        }
+      ],
+      "turns": 30,
+      "firstTime": 1788245506124,
+      "lastTime": 1788384301306,
+      "errorSamples": [
+        {
+          "tool": "update_goal",
+          "text": "Error: no current goal "
+        },
+        {
+          "tool": "grep",
+          "text": "Error: grep search failed (exit 2): rg: C:\\Users\\gru\\AppData\\Local\\npm-cache\\_npx\\1e7f6d9597241db0\\packages: IO error for operation on C:\\Users\\gru\\AppData\\Local\\npm-cache\\_npx\\1e7f6d9597241db0\\packages: The system canno"
+        },
+        {
+          "tool": "grep",
+          "text": "Error: tool call timed out after 30000ms "
+        },
+        {
+          "tool": "edit",
+          "text": "Error: old_string was not found in \"C:\\Users\\gru\\.dsh\\profiles\\node_modules\\@deepseek-ai\\dsh-session\\lib\\index.js\" "
+        },
+        {
+          "tool": "edit",
+          "text": "Error: old_string was not found in \"C:\\Users\\gru\\AppData\\Local\\Temp\\dzn\\dxcorestep.c\" "
+        },
+        {
+          "tool": "read",
+          "text": "Error: cannot read \"D:\\dsh workspace\\dsh test project\\refs\\bombjack_audio.wav\": binary file "
+        },
+        {
+          "tool": "edit",
+          "text": "Error: old_string was not found in \"D:\\dsh workspace\\dsh test project\\bombjack.html\" "
+        },
+        {
+          "tool": "edit",
+          "text": "Error: old_string was not found in \"D:\\dsh workspace\\dsh test project\\bombjack.html\" "
+        },
+        {
+          "tool": "edit",
+          "text": "Error: old_string was not found in \"D:\\dsh workspace\\dsh test project\\bombjack.html\" "
+        },
+        {
+          "tool": "edit",
+          "text": "Error: old_string was not found in \"D:\\dsh workspace\\dsh test project\\bombjack.html\" "
+        },
+        {
+          "tool": "edit",
+          "text": "Error: old_string was not found in \"D:\\dsh workspace\\dsh test project\\bombjack.html\" "
+        }
+      ],
+      "durationMin": 2313
+    },
+    "session-59142530-2890-46d9-9fa1-bac8c07a18af": {
+      "toolCalls": 0,
+      "toolErrors": 0,
+      "steps": 0,
+      "userMsgs": 0,
+      "llmRetries": 0,
+      "compactions": 0,
+      "approvals": 0,
+      "byTool": {},
+      "errByTool": {},
+      "repeatPairs": [],
+      "turns": 0,
+      "firstTime": 1788332664415,
+      "lastTime": 1788332664431,
+      "errorSamples": [],
+      "durationMin": 0
+    },
+    "session-c32f5103-a8e0-4c49-bdf7-03dfb63738ae": {
+      "toolCalls": 89,
+      "toolErrors": 2,
+      "steps": 86,
+      "userMsgs": 8,
+      "llmRetries": 0,
+      "compactions": 3,
+      "approvals": 0,
+      "byTool": {
+        "pwsh": 36,
+        "read": 27,
+        "grep": 11,
+        "write": 4,
+        "edit": 10,
+        "glob": 1
+      },
+      "errByTool": {
+        "edit": 2
+      },
+      "repeatPairs": [
+        {
+          "name": "pwsh",
+          "args": "[object Object]"
+        },
+        {
+          "name": "pwsh",
+          "args": "[object Object]"
+        },
+        {
+          "name": "read",
+          "args": "[object Object]"
+        },
+        {
+          "name": "read",
+          "args": "[object Object]"
+        },
+        {
+          "name": "pwsh",
+          "args": "[object Object]"
+        }
+      ],
+      "turns": 3,
+      "firstTime": 1787940342483,
+      "lastTime": 1788294967484,
+      "errorSamples": [
+        {
+          "tool": "edit",
+          "text": "Error: old_string was not found in \"C:\\Users\\gru\\.dsh\\settings.yaml\" "
+        },
+        {
+          "tool": "edit",
+          "text": "Error: edit requires reading \"C:\\Users\\gru\\.dsh\\settings.yaml\" first — read the file, then retry "
+        }
+      ],
+      "durationMin": 5910
+    },
+    "session-c816bc81-19cd-4f29-80a7-f60b6897970a": {
+      "toolCalls": 186,
+      "toolErrors": 16,
+      "steps": 157,
+      "userMsgs": 33,
+      "llmRetries": 5,
+      "compactions": 13,
+      "approvals": 19,
+      "byTool": {
+        "pwsh": 62,
+        "read": 31,
+        "grep": 13,
+        "glob": 4,
+        "todo_write": 2,
+        "write": 33,
+        "web_search": 1,
+        "edit": 26,
+        "ask_user_question": 2,
+        "read_image": 12
+      },
+      "errByTool": {
+        "read": 2,
+        "pwsh": 1,
+        "write": 1,
+        "web_search": 1,
+        "read_image": 5,
+        "grep": 1,
+        "edit": 5
+      },
+      "repeatPairs": [
+        {
+          "name": "pwsh",
+          "args": "[object Object]"
+        },
+        {
+          "name": "read",
+          "args": "[object Object]"
+        },
+        {
+          "name": "write",
+          "args": "[object Object]"
+        },
+        {
+          "name": "write",
+          "args": "[object Object]"
+        },
+        {
+          "name": "pwsh",
+          "args": "[object Object]"
+        },
+        {
+          "name": "grep",
+          "args": "[object Object]"
+        },
+        {
+          "name": "read",
+          "args": "[object Object]"
+        },
+        {
+          "name": "edit",
+          "args": "[object Object]"
+        }
+      ],
+      "turns": 20,
+      "firstTime": 1787580883078,
+      "lastTime": 1788294968860,
+      "errorSamples": [
+        {
+          "tool": "read",
+          "text": "Error: cannot read \"C:\\Users\\gru\\.dsh\\profiles\\web\\cordis.patch file_path> C:\\Users\\gru\\.dsh\\profiles\\web\\cordis.patch.yml\": not found "
+        },
+        {
+          "tool": "pwsh",
+          "text": "Error: invalid arguments: missing required property \"description\" "
+        },
+        {
+          "tool": "read",
+          "text": "Error: cannot read \"C:\\Users\\gru\\.dsh\": not a regular file "
+        },
+        {
+          "tool": "write",
+          "text": "Error: invalid arguments: missing required property \"file_path\" "
+        },
+        {
+          "tool": "web_search",
+          "text": "Error: DeepSeek search has no API key for \"DEEPSEEK_API_KEY\"; store it through the credentials service (the web Models page writes it), export it in the launching environment, or set a literal \"apiKey\" in the web-search-"
+        },
+        {
+          "tool": "read_image",
+          "text": "Error: cannot read \"D:\\dsh workspace\\dsh test project\\research\\refs\\wiki-3.png\" as an image: model \"qwen38\" does not declare image input; switch to an image-capable model to read images "
+        },
+        {
+          "tool": "read_image",
+          "text": "Error: cannot read \"D:\\dsh workspace\\dsh test project\\research\\refs\\wiki-1.png\" as an image: model \"qwen38\" does not declare image input; switch to an image-capable model to read images "
+        },
+        {
+          "tool": "read_image",
+          "text": "Error: cannot read \"D:\\dsh workspace\\dsh test project\\research\\refs\\wiki-3.png\" as an image: model \"qwen38\" does not declare image input; switch to an image-capable model to read images "
+        },
+        {
+          "tool": "grep",
+          "text": "Error: tool call timed out after 30000ms "
+        },
+        {
+          "tool": "edit",
+          "text": "Error: [sandbox: file access denied under workspace-write mode] [sandbox: escalation available — retry this exact operation once with sandbox_permissions (the narrowest wider mode that suffices) + justification; the appr"
+        },
+        {
+          "tool": "read_image",
+          "text": "Error: cannot read \"D:\\dsh workspace\\dsh test project\\research\\refs\\yt-maxresdefault.jpg\": not found "
+        },
+        {
+          "tool": "read_image",
+          "text": "Error: cannot read \"D:\\dsh workspace\\dsh test project\\research\\refs\\yt-hq1.jpg\": not found "
+        }
+      ],
+      "durationMin": 11901
+    }
+  },
+  "grand": {
+    "toolCalls": 2474,
+    "toolErrors": 54,
+    "steps": 2448,
+    "userMsgs": 224,
+    "llmRetries": 0,
+    "compactions": 55,
+    "approvals": 19,
+    "byTool": {
+      "pwsh": 1024,
+      "write": 289,
+      "edit": 289,
+      "web_search": 49,
+      "report": 2,
+      "read": 404,
+      "grep": 201,
+      "todo_write": 58,
+      "job_output": 58,
+      "job_kill": 3,
+      "ask_user_question": 17,
+      "subagent": 3,
+      "job_list": 1,
+      "read_image": 50,
+      "glob": 24,
+      "exit_plan_mode": 1,
+      "update_goal": 1
+    },
+    "errByTool": {
+      "web_search": 8,
+      "write": 3,
+      "edit": 23,
+      "read_image": 10,
+      "exit_plan_mode": 1,
+      "grep": 4,
+      "update_goal": 1,
+      "read": 3,
+      "pwsh": 1
+    },
+    "repeatToolPairs": 95,
+    "repeatPairs": []
+  }
+}
