@@ -90,12 +90,12 @@ check(nearestAbove !== topPlat || S.G.plat.length <= 2,
 const e2 = S.spawnEnemy('cat');
 e2.surf = 'plat'; e2.minX = lowest.x + 6; e2.maxX = lowest.x + lowest.w - 6;
 e2.baseY = lowest.y - 17; e2.y = e2.baseY; e2.x = lowest.x + lowest.w / 2; e2.dir = 1;
-e2._jumpStop = 1; e2._jumpTarget = nearestAbove; // force: 1 frame stop then jump
+e2._jumpTarget = nearestAbove; // force: jump immediately (no stop)
 const beforeY = e2.baseY;
-S.stepEnemyWalk(e2); // frame 1: stop decrement (1->0)
-S.stepEnemyWalk(e2); // frame 2: execute jump
+// run 25 frames: 20-frame jump arc + a few walking frames
+for (let f = 0; f < 25; f++) S.stepEnemyWalk(e2);
 check(e2.baseY === nearestAbove.y - 17,
-  'enemy jumped exactly ONE level up to nearest (baseY ' + beforeY + ' -> ' + e2.baseY + ', target ' + (nearestAbove.y - 17) + ')',
+  'enemy jumped ONE level up to nearest (baseY ' + beforeY + ' -> ' + e2.baseY + ', target ' + (nearestAbove.y - 17) + ')',
   'wrong jump height (baseY ' + e2.baseY + ', expected ' + (nearestAbove.y - 17) + ')');
 
 // ---- Test 3: 0.6s stop before jump — setting _jumpStop=36 makes the enemy
@@ -105,16 +105,16 @@ e3.surf = 'plat'; e3.minX = lowest.x + 6; e3.maxX = lowest.x + lowest.w - 6;
 e3.baseY = lowest.y - 17; e3.y = e3.baseY; e3.x = lowest.x + lowest.w / 2; e3.dir = 1;
 e3._jumpStop = 36; e3._jumpTarget = nearestAbove;
 const x0 = e3.x;
-// run 20 frames: should NOT have moved (still in stop)
+// run 20 frames: should NOT have moved (still in 0.6s stop)
 for (let f = 0; f < 20; f++) S.stepEnemyWalk(e3);
 check(e3.x === x0 && e3.baseY === lowest.y - 17,
   'during 0.6s stop: enemy does not move (x=' + e3.x + ', baseY=' + e3.baseY + ')',
   'enemy moved during stop: x ' + x0 + ' -> ' + e3.x + ', baseY ' + e3.baseY);
-// run remaining 16+ frames: stop should expire and jump should execute
-for (let f = 0; f < 20; f++) S.stepEnemyWalk(e3);
+// run 60 more frames: stop expires (16 left) + 20-frame jump arc + walking
+for (let f = 0; f < 60; f++) S.stepEnemyWalk(e3);
 check(e3.baseY === nearestAbove.y - 17,
-  'after 0.6s stop: enemy jumped to upper platform (baseY ' + e3.baseY + ')',
-  'enemy did not jump after stop (baseY ' + e3.baseY + ')');
+  'after 0.6s stop + arc: enemy on upper platform (baseY ' + e3.baseY + ')',
+  'enemy did not reach upper platform (baseY ' + e3.baseY + ')');
 
 // ---- Test 4: freeze end un-coins minis (body back) ----
 S.P.dead = false; // restore for boss tests below
