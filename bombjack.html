@@ -1519,24 +1519,22 @@ function drawMitsubishi(g, x, y, size, rotation) {
     if (i === 0) g.moveTo(px, py); else g.lineTo(px, py);
   }
   g.closePath(); g.fill();
-  // 3 elongated rhombuses (4 sides each): narrow vertex toward center,
-  // wider vertex outward — meeting at a single point in the middle
+  // 3 elongated rhombuses (4 sides): pointy vertex toward center,
+  // pointy vertex outward, widest at the sides — meeting at a single center point
   g.fillStyle = '#cc0000';
-  const d = size * 0.50;
+  const d = size * 0.55;
   for (let i = 0; i < 3; i++) {
     const baseAng = -Math.PI / 2 + i * (2 * Math.PI / 3);
-    const r1 = 0;          // inner vertex at the center
-    const r2 = d * 0.92;   // outer vertex near the edge
-    const halfW1 = d * 0.06; // narrow inner (≈vertex)
-    const halfW2 = d * 0.44; // wide outer
+    const r1 = 0;           // inner vertex at the center
+    const r2 = d * 0.95;    // outer vertex near the edge
+    const halfW = d * 0.22; // half-width at the widest point (mid-length)
     g.save();
     g.rotate(baseAng);
-    // 4-sided rhombus: two vertices on the radial axis, two on the tangent
     g.beginPath();
-    g.moveTo(r1, 0);        // inner vertex (center)
-    g.lineTo((r1 + r2) / 2, -halfW2); // left side
-    g.lineTo(r2, 0);        // outer vertex
-    g.lineTo((r1 + r2) / 2, halfW2);  // right side
+    g.moveTo(r1, 0);                    // inner point (center)
+    g.lineTo((r1 + r2) / 2, -halfW);   // upper side
+    g.lineTo(r2, 0);                    // outer point
+    g.lineTo((r1 + r2) / 2, halfW);    // lower side
     g.closePath();
     g.fill();
     g.restore();
