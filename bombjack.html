@@ -1557,28 +1557,52 @@ function drawPlayer() {
   if (P.face < 0) { cx.save(); cx.translate(P.x + CFG.PLAYER_W, 0); cx.scale(-1, 1); cx.drawImage(spr, 0, P.y, CFG.PLAYER_W, CFG.PLAYER_H); cx.restore(); }
   else cx.drawImage(spr, P.x, P.y, CFG.PLAYER_W, CFG.PLAYER_H);
 }
-// Mitsubishi trident logo (3 red diamonds, no letters) — P powerup
-// Z-axis rotation: scales X by cos(angle) to simulate rotation out of the screen
-function drawMitsubishi(g, x, y, size, rotT) {
-  const zScale = Math.abs(Math.cos(rotT * 0.04)); // 0..1, oscillates
+// ================= PILL POWER-UPS =============================================
+// Shared pill body: a white capsule with a thin colored border at ~5% of its
+// radius, a soft drop shadow, and Z-axis rotation (X scaled by cos(angle)).
+// The emblem (Mitsubishi / Superman S / letter) is "carved" into the face.
+function drawPillBase(g, x, y, w, h, borderCol, rotT) {
+  const zScale = Math.max(0.25, Math.abs(Math.cos(rotT * 0.04))); // 0..1
+  const r = h * 0.5;
+  // rotation shadow (offset ellipse under the pill, fades with zScale)
   g.save();
   g.translate(x, y);
-  g.scale(zScale, 1); // Z-axis: squeeze horizontally
-  // white hex background
-  g.fillStyle = '#fff';
+  g.scale(zScale, 1);
+  g.fillStyle = 'rgba(0,0,0,' + (0.35 * (1 - zScale) + 0.08) + ')';
+  g.beginPath(); g.ellipse(0, h * 0.52, w * 0.5, h * 0.16, 0, 0, 7); g.fill();
+  // pill body (rounded rect = capsule)
+  const px = -w / 2, py = -h / 2;
   g.beginPath();
-  for (let i = 0; i < 6; i++) {
-    const a = i * Math.PI / 3 - Math.PI / 6;
-    const px = Math.cos(a) * size * 0.85, py = Math.sin(a) * size * 0.85;
-    if (i === 0) g.moveTo(px, py); else g.lineTo(px, py);
-  }
-  g.closePath(); g.fill();
-  // 3 elongated rhombuses
+  g.moveTo(px + r, py);
+  g.lineTo(px + w - r, py);
+  g.arc(px + w - r, py + r, r, -Math.PI / 2, Math.PI / 2);
+  g.lineTo(px + r, py + h);
+  g.arc(px + r, py + r, r, Math.PI / 2, -Math.PI / 2);
+  g.closePath();
+  g.fillStyle = '#fff'; g.fill();
+  g.lineWidth = r * 0.10; // ~5% of radius border
+  g.strokeStyle = borderCol; g.stroke();
+  // top-left highlight for the pill sheen
+  g.fillStyle = 'rgba(255,255,255,0.55)';
+  g.beginPath();
+  g.ellipse(-w * 0.16, -h * 0.26, w * 0.28, h * 0.16, -0.5, 0, 7);
+  g.fill();
+  g.restore();
+  return zScale;
+}
+// Mitsubishi 3-rhombus emblem carved into the P pill
+function drawMitsubishi(g, x, y, size, rotT) {
+  const w = size * 1.55, h = size * 1.55; // ~14px, matches current powerup hitbox
+  drawPillBase(g, x, y, w, h, '#cc0000', rotT);
+  const zScale = Math.max(0.25, Math.abs(Math.cos(rotT * 0.04)));
+  g.save();
+  g.translate(x, y);
+  g.scale(zScale, 1);
   g.fillStyle = '#cc0000';
-  const d = size * 0.82;
+  const d = size * 0.62;
   for (let i = 0; i < 3; i++) {
     const baseAng = -Math.PI / 2 + i * (2 * Math.PI / 3);
-    const r1 = 0, r2 = d * 0.95, halfW = d * 0.32;
+    const r1 = 0, r2 = d * 0.95, halfW = d * 0.30;
     g.save();
     g.rotate(baseAng);
     g.beginPath();
@@ -1592,20 +1616,32 @@ function drawMitsubishi(g, x, y, size, rotT) {
   }
   g.restore();
 }
-// Superman S powerup — white circle with red S, Z-axis rotation
+// Superman S emblem carved into the S pill
 function drawSupermanS(g, x, y, size, rotT) {
-  const zScale = Math.abs(Math.cos(rotT * 0.04));
+  const w = size * 1.55, h = size * 1.55;
+  drawPillBase(g, x, y, '#cc0000', rotT);
+  const zScale = Math.max(0.25, Math.abs(Math.cos(rotT * 0.04)));
   g.save();
   g.translate(x, y);
   g.scale(zScale, 1);
-  // white circle
-  g.fillStyle = '#fff';
-  g.beginPath(); g.arc(0, 0, size * 0.85, 0, 7); g.fill();
-  // red S (stylized)
   g.fillStyle = '#cc0000';
-  g.font = 'bold ' + Math.round(size * 1.1) + 'px sans-serif';
+  g.font = 'bold ' + Math.round(size * 0.95) + 'px sans-serif';
   g.textAlign = 'center'; g.textBaseline = 'middle';
   g.fillText('S', 0, 1);
+  g.restore();
+}
+// B / E powerup — letter on a pill (blue border), same footprint
+function drawLetterPill(g, x, y, size, letter, col, rotT) {
+  const w = size * 1.55, h = size * 1.55;
+  drawPillBase(g, x, y, col, rotT);
+  const zScale = Math.max(0.25, Math.abs(Math.cos(rotT * 0.04)));
+  g.save();
+  g.translate(x, y);
+  g.scale(zScale, 1);
+  g.fillStyle = col;
+  g.font = 'bold ' + Math.round(size * 0.95) + 'px sans-serif';
+  g.textAlign = 'center'; g.textBaseline = 'middle';
+  g.fillText(letter, 0, 1);
   g.restore();
 }
 function drawWorld() {
@@ -1619,8 +1655,7 @@ function drawWorld() {
     } else if (pu.L === 'S') {
       drawSupermanS(g, pu.x, pu.y, 9, pu.t);
     } else {
-      g.drawImage(SPR.hex, pu.x - 7, pu.y - 7, 14, 14);
-      txt(g, pu.L, pu.x - 3, pu.y + 4, '#f0f040', 9);
+      drawLetterPill(g, pu.x, pu.y, 9, pu.L, pu.L === 'B' ? '#2090e0' : '#40c040', pu.t);
     }
   }
   // fireballs (S powerup effect)
