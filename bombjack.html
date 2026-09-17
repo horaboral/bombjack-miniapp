@@ -1590,21 +1590,20 @@ function drawPillBase(g, x, y, w, h, borderCol, rotT) {
   g.restore();
   return zScale;
 }
-// Mitsubishi 3-rhombus emblem carved into the P pill
+// Mitsubishi 3-rhombus emblem — grey/dark, carved into the pill with a soft
+// shadow (same treatment as the Superman S): not red.
 function drawMitsubishi(g, x, y, size, rotT) {
   const w = size * 1.55, h = size * 1.55; // ~14px, matches current powerup hitbox
-  drawPillBase(g, x, y, w, h, '#cc0000', rotT);
+  drawPillBase(g, x, y, w, h, '#9aa0a6', rotT); // grey border — carved, not red
   const zScale = Math.max(0.25, Math.abs(Math.cos(rotT * 0.04)));
   g.save();
   g.translate(x, y);
   g.scale(zScale, 1);
-  g.fillStyle = '#cc0000';
   const d = size * 0.62;
-  for (let i = 0; i < 3; i++) {
-    const baseAng = -Math.PI / 2 + i * (2 * Math.PI / 3);
+  const rhombus = (ang) => {
     const r1 = 0, r2 = d * 0.95, halfW = d * 0.30;
     g.save();
-    g.rotate(baseAng);
+    g.rotate(ang);
     g.beginPath();
     g.moveTo(r1, 0);
     g.lineTo((r1 + r2) / 2, -halfW);
@@ -1613,21 +1612,55 @@ function drawMitsubishi(g, x, y, size, rotT) {
     g.closePath();
     g.fill();
     g.restore();
-  }
+  };
+  // carving shadow (offset, soft grey)
+  g.save();
+  g.translate(d * 0.10, d * 0.14);
+  g.fillStyle = 'rgba(40,40,46,0.45)';
+  for (let i = 0; i < 3; i++) rhombus(-Math.PI / 2 + i * (2 * Math.PI / 3));
+  g.restore();
+  // rhombus bodies (dark grey)
+  g.fillStyle = '#565b61';
+  for (let i = 0; i < 3; i++) rhombus(-Math.PI / 2 + i * (2 * Math.PI / 3));
   g.restore();
 }
-// Superman S emblem carved into the S pill
+// Superman shield — grey/dark, carved into the pill, S cut out (white shows
+// through). Carving = soft grey drop-shadow under the shield + white S punched
+// through to the pill surface.
 function drawSupermanS(g, x, y, size, rotT) {
   const w = size * 1.55, h = size * 1.55;
-  drawPillBase(g, x, y, '#cc0000', rotT);
+  drawPillBase(g, x, y, '#9aa0a6', rotT); // grey border — carved, not red
   const zScale = Math.max(0.25, Math.abs(Math.cos(rotT * 0.04)));
   g.save();
   g.translate(x, y);
   g.scale(zScale, 1);
-  g.fillStyle = '#cc0000';
-  g.font = 'bold ' + Math.round(size * 0.95) + 'px sans-serif';
+  const s = size * 0.52; // shield half-extent
+  // shield outline (flat top, slanted shoulders, pointy bottom)
+  function shieldPath() {
+    g.beginPath();
+    g.moveTo(-s, -s * 0.62);
+    g.lineTo(s, -s * 0.62);
+    g.lineTo(s * 0.92, -s * 0.18);
+    g.lineTo(0, s * 1.05);
+    g.lineTo(-s * 0.92, -s * 0.18);
+    g.closePath();
+  }
+  // carving shadow (offset down-right, soft)
+  shieldPath();
+  g.save();
+  g.translate(s * 0.10, s * 0.14);
+  g.fillStyle = 'rgba(40,40,46,0.45)';
+  g.fill();
+  g.restore();
+  // shield body (dark grey)
+  shieldPath();
+  g.fillStyle = '#565b61';
+  g.fill();
+  // S cut out — white pill shows through the carving
+  g.fillStyle = '#fff';
+  g.font = 'bold ' + Math.round(s * 2.1) + 'px sans-serif';
   g.textAlign = 'center'; g.textBaseline = 'middle';
-  g.fillText('S', 0, 1);
+  g.fillText('S', 0, s * 0.10);
   g.restore();
 }
 // B / E powerup — letter on a pill (blue border), same footprint
