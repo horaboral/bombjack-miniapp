@@ -1841,52 +1841,59 @@ function drawMitsubishi(g, x, y, size, rotT) {
   for (let i = 0; i < 3; i++) rhombus(-Math.PI / 2 + i * (2 * Math.PI / 3));
   g.restore();
 }
-// Superman shield logo (the real emblem, not a letter): red shield with a gold
-// border and a gold S. No separate "S" character — the S IS the logo.
-// The coin-spin shows the coin's EDGE: zScale = |cos| runs all the way to 0, so
-// the thin sliver (the coin's thickness) is drawn instead of being skipped.
+// Superman emblem — same treatment as the Mitsubishi: a WHITE pill with the
+// grey carved border (identical size / spin / footprint), and the classic
+// diamond shield + S "carved" into it (dark grey body, white S punched
+// through to the pill surface, soft grey shadow for the carve).
 function drawSupermanS(g, x, y, size, rotT) {
-  const R = size * 0.95; // shield radius (half-width)
-  const z = Math.abs(Math.cos(rotT * 0.05)); // 0 (edge-on) .. 1 (face-on)
-  const s = R * (0.2 + 0.8 * z);             // shield width, edge-on sliver kept
-  const hgt = R * 1.25;                       // shield height (vertical, unscaled)
-  // shield outline: flat top, slanted shoulders, pointy bottom
-  function shieldPath() {
-    g.beginPath();
-    g.moveTo(-s, -hgt * 0.62);
-    g.lineTo(s, -hgt * 0.62);
-    g.lineTo(s * 0.92, -hgt * 0.18);
-    g.lineTo(0, hgt * 1.02);
-    g.lineTo(-s * 0.92, -hgt * 0.18);
-    g.closePath();
-  }
+  const w = size * 1.55, h = size * 1.55; // identical to Mitsubishi
+  drawPillBase(g, x, y, w, h, '#9aa0a6', rotT); // white pill, grey border
+  const zScale = Math.max(0.25, Math.abs(Math.cos(rotT * 0.04)));
   g.save();
   g.translate(x, y);
-  // shield body: red with a gold border
-  shieldPath();
-  g.lineWidth = Math.max(0.6, R * 0.16 * z + 0.4);
-  g.strokeStyle = '#f2c200'; // gold border
-  g.stroke();
-  g.fillStyle = '#d81f26';   // red field
-  g.fill();
-  // gold S emblem: a single thick stroked S-curve (top hook -> bottom hook)
-  const sw = s * 0.62, sh = hgt * 0.30;
-  g.beginPath();
-  g.moveTo(sw * 0.85, -sh * 0.85);
-  g.quadraticCurveTo(-sw * 0.95, -sh * 1.05, -sw * 0.55, -sh * 0.05);
-  g.quadraticCurveTo(-sw * 0.30, sh * 0.42, sw * 0.28, sh * 0.45);
-  g.quadraticCurveTo(sw * 0.95, sh * 0.48, sw * 0.85, sh * 0.95);
-  g.lineWidth = Math.max(1.0, s * 0.42);
-  g.lineCap = 'round';
-  g.strokeStyle = '#f2c200';
-  g.stroke();
-  // edge sliver: a thin gold strip on the side the coin faces, only visible
-  // near edge-on (this is the coin's thickness — the part the old spin skipped)
-  if (z < 0.9) {
-    const edgeW = Math.max(0.4, (1 - z) * R * 0.5);
-    g.fillStyle = '#caa000';
-    g.fillRect(z < 0.5 ? -s - edgeW : s, -hgt * 0.55, edgeW, hgt * 1.0);
+  g.scale(zScale, 1);
+  const d = size * 0.62; // emblem half-width, same scale as Mitsubishi
+  // diamond shield: flat-ish top, slanted top corners, pointy bottom
+  function diamondPath() {
+    g.beginPath();
+    g.moveTo(-d, -d * 0.70);
+    g.lineTo(d, -d * 0.70);
+    g.lineTo(d * 1.08, -d * 0.20);
+    g.lineTo(0, d * 1.35);
+    g.lineTo(-d * 1.08, -d * 0.20);
+    g.closePath();
   }
+  // the S carved through the diamond: a thick stroked S-curve (white = pill
+  // surface showing through the cut)
+  function sCarve(col, ox, oy) {
+    const sw = d * 0.62, sh = d * 0.42;
+    g.save();
+    g.translate(ox, oy);
+    g.beginPath();
+    g.moveTo(sw * 0.85, -sh * 0.85);
+    g.quadraticCurveTo(-sw * 0.95, -sh * 1.05, -sw * 0.55, -sh * 0.05);
+    g.quadraticCurveTo(-sw * 0.30, sh * 0.42, sw * 0.28, sh * 0.45);
+    g.quadraticCurveTo(sw * 0.95, sh * 0.48, sw * 0.85, sh * 0.95);
+    g.lineWidth = sh * 0.80;
+    g.lineCap = 'round';
+    g.strokeStyle = col;
+    g.stroke();
+    g.restore();
+  }
+  // carving shadow (offset, soft grey)
+  g.save();
+  g.translate(d * 0.10, d * 0.14);
+  diamondPath();
+  g.fillStyle = 'rgba(40,40,46,0.45)';
+  g.fill();
+  sCarve('rgba(40,40,46,0.45)', 0, 0);
+  g.restore();
+  // diamond body (dark grey, same as Mitsubishi)
+  diamondPath();
+  g.fillStyle = '#565b61';
+  g.fill();
+  // S punched through (white pill shows through the carving)
+  sCarve('#fff', 0, 0);
   g.restore();
 }
 // B / E powerup — letter on a pill (blue border), same footprint
