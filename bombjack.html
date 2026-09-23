@@ -140,6 +140,7 @@ const G = {
   // Boss: Jotito (roach, screen 0) / Sobesinho (gorilla, screen 1)
   boss: null, // {kind,name,frames,x,y,dx,dy,hp,maxHp,spawnT,poofT,spawnCd}
   bossPoofs: [], // {x, y, t}
+  bossDeathPause: 0, // >0 = screen paused for the boss death animation
 };
 const P = { x: 70, y: CFG.GROUND_Y - CFG.PLAYER_H, vy: 0, vx: 0, face: 1,
   grounded: true, jumping: false, glide: false, dead: false, invuln: 90, anim: 0, lastUp: 0 };
@@ -310,10 +311,9 @@ function bossStep() {
   if (!b) return;
   if (b.poofT > 0) {
     b.poofT--;
-    // Dead boss lingers on screen (hell-filled silhouette) — it does NOT
-    // vanish; the round clears when the player advances. It stays frozen:
-    // no movement, no mini-spawns, no collision.
-    if (b.poofT <= 0) b.poofT = 999999; // hold forever until setScreen clears
+    // Dead boss lingers (hell-filled silhouette) for DEATH_SEQ frames while
+    // the screen is paused, then it vanishes and the screen resumes.
+    if (b.poofT <= 0) { G.boss = null; G.bossDeathPause = 0; }
     return;
   }
   if (G.st !== ST.PLAY) return;
@@ -374,12 +374,15 @@ function bossStep() {
     else { P.vy = (b.y < P.y ? 1 : -1) * 3.0; P.grounded = false; }
   }
 }
+const DEATH_SEQ = 120; // ~2s at 60fps
 function bossPoof(b) {
   // Death: keep the silhouette, fill it with the animated hell.gif (muppet
-  // head centered). The boss stays on screen (frozen, no collision/spawn)
-  // until the round clears.
-  b.poofT = 600;
+  // head centered). The whole screen's moving elements PAUSE for DEATH_SEQ
+  // frames while the boss lingers, then everything resumes and the boss
+  // disappears.
+  b.poofT = DEATH_SEQ;
   b._dead = true;
+  G.bossDeathPause = DEATH_SEQ; // global pause for hero/minis/powerups/enemies
   const img = b.frames[G.faceFrame];
   if (img && img.complete) {
     const m = img._silMask || (img._silMask = silhouetteMask(img));
@@ -2156,12 +2159,20 @@ function tick() {
     // Advance the real-face animation during play too (boss + minis on screens 1/2)
     G.faceClock++;
     if (G.faceClock >= 60 / FACE_FPS) { G.faceClock = 0; G.faceFrame = (G.faceFrame + 1) % FACE_N; }
-    playerStep();
-    bombStep();
-    powerupStep();
-    fireballStep();
-    coinStep();
-    enemyStep();
+    // Boss death animation: freeze ALL moving elements (hero, minis,
+    // powerups, fireballs, enemies) for DEATH_SEQ frames while the
+    // hell-filled boss silhouette lingers. Everything resumes once it ends.
+    if (G.bossDeathPause > 0) {
+      G.bossDeathPause--;
+      if (G.bossDeathPause <= 0 && G.boss && G.boss.poofT <= 0) G.boss = null;
+    } else {
+      playerStep();
+      bombStep();
+      powerupStep();
+      fireballStep();
+      coinStep();
+      enemyStep();
+    }
     bossStep();
     for (const p of G.pops) { p.y -= 0.4; p.t--; }
     G.pops = G.pops.filter(p => p.t > 0);

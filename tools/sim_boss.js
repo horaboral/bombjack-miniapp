@@ -274,16 +274,21 @@ S.setScreen(0);
 S.G.st = S.ST.PLAY;
 S.G.boss.hp = 1; S.G.boss.hitCd = 0;
 S.bossPoof(S.G.boss);
-// the boss should be marked dead, hold its silhouette mask, and not vanish
+// the boss should be marked dead, hold its silhouette mask, and the screen
+// should be paused for the death sequence
 check(S.G.boss && S.G.boss._dead === true, 'bossPoof marks boss dead (_dead=true)', 'boss not marked dead');
 check(S.G.boss && S.G.boss._silMask !== undefined, 'dead boss retains silhouette mask for hell fill', 'no mask retained on dead boss');
-// step a few frames: poofT must stay > 0 (held), G.boss must NOT be cleared
-for (let f = 0; f < 100; f++) S.bossStep();
-check(S.G.boss && S.G.boss.poofT > 0, 'dead boss lingers on screen (poofT held at ' + (S.G.boss && S.G.boss.poofT) + ')', 'dead boss vanished (poofT=' + (S.G.boss && S.G.boss.poofT) + ')');
-// drawDeadBoss must not throw headlessly (stub canvas)
+check(S.G.bossDeathPause === 120, 'death sequence = 120 frames / ~2s (pause=' + S.G.bossDeathPause + ')', 'wrong death pause: ' + S.G.bossDeathPause);
+// drawDeadBoss must not throw headlessly (stub canvas) — call it while the
+// boss is still on screen (before the sequence ends and clears G.boss).
 let drawErr = null;
 try { if (S.drawDeadBoss) S.drawDeadBoss(S.cx, S.G.boss); } catch (e) { drawErr = e; }
 check(drawErr === null, 'drawDeadBoss runs headless without error', 'drawDeadBoss threw: ' + (drawErr && drawErr.message));
+// step the death sequence: boss lingers while paused, then VANISHES at the end
+let steps = 0;
+while (S.G.boss) { S.bossStep(); steps++; }
+check(steps === 120, 'dead boss lingers ~2s (120 frames) then vanishes (steps=' + steps + ')', 'boss vanished after ' + steps + ' steps');
+check(S.G.bossDeathPause === 0, 'death pause cleared after sequence (pause=' + S.G.bossDeathPause + ')', 'pause not cleared: ' + S.G.bossDeathPause);
 
 // ---- Test 12: while boss ALIVE, spawning still works (regression) ----
 S.setScreen(0);
