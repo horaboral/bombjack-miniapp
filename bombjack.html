@@ -190,6 +190,55 @@ function bossDrawSize(kind) {
   if (kind === 'roach')   return [Math.round(36 * 0.65), Math.round(74 * 0.65)]; // 23x48
   return [54, 66];
 }
+// ---- Pixel-silhouette collision: bounce = real (or about-to) overlap of two
+// backgroundless silhouettes, NOT block/square AABB. Each monster keeps a
+// static alpha mask (the face PNG is transparent outside the body). We test
+// whether the player's solid rect and the monster's silhouette share >= OVERLAP
+// pixels within a small margin — i.e. they are touching or 1-2px about to.
+const SIL_MARGIN = 2, SIL_OVERLAP = 2;
+const _silScratch = document.createElement('canvas');
+function silhouetteMask(img) {
+  if (!img || !img.complete || !img.naturalWidth) return null;
+  const c = document.createElement('canvas');
+  c.width = img.naturalWidth; c.height = img.naturalHeight;
+  const g = c.getContext('2d');
+  g.drawImage(img, 0, 0);
+  const d = g.getImageData(0, 0, c.width, c.height).data;
+  const m = new Uint8Array(c.width * c.height);
+  for (let i = 0; i < m.length; i++) m[i] = d[i * 4 + 3] > 40 ? 1 : 0;
+  return { w: c.width, h: c.height, m };
+}
+// e = {type,x,y,frame} or boss b={kind,x,y,bw,bh}; P = player
+function silhouetteHit(e, b) {
+  const isBoss = !!b;
+  const kind = isBoss ? b.kind : e.type;
+  const frames = kind === 'roach' ? G.roachFrames : G.gorillaFrames;
+  const img = frames[G.faceFrame];
+  const mask = img ? (img._silMask || (img._silMask = silhouetteMask(img))) : null;
+  if (!mask) return false;
+  const ex = isBoss ? b.x : e.x, ey = isBoss ? b.y : e.y;
+  const ew = isBoss ? b.bw : (kind === 'roach' ? 14 : 16);
+  const eh = isBoss ? b.bh : (kind === 'roach' ? 28 : 24);
+  // destination rect for the monster silhouette
+  const dx0 = Math.round(ex - ew / 2), dy0 = Math.round(ey - eh / 2);
+  const sx0 = Math.max(0, Math.round((P.x - dx0) * mask.w / ew) - SIL_MARGIN);
+  const sy0 = Math.max(0, Math.round((P.y - dy0) * mask.h / eh) - SIL_MARGIN);
+  const sx1 = Math.min(mask.w, Math.round((P.x + CFG.PLAYER_W - dx0) * mask.w / ew) + SIL_MARGIN);
+  const sy1 = Math.min(mask.h, Math.round((P.y + CFG.PLAYER_H - dy0) * mask.h / eh) + SIL_MARGIN);
+  if (sx1 <= sx0 || sy1 <= sy0) return false;
+  let overlap = 0;
+  const pw = CFG.PLAYER_W, ph = CFG.PLAYER_H;
+  for (let sy = sy0; sy < sy1; sy++) {
+    for (let sx = sx0; sx < sx1; sx++) {
+      if (!mask.m[sy * mask.w + sx]) continue;
+      // map this mask pixel back to player-local coords; count if inside the solid player rect
+      const lpx = (dx0 + sx * ew / mask.w) - P.x;
+      const lpy = (dy0 + sy * eh / mask.h) - P.y;
+      if (lpx >= 0 && lpx < pw && lpy >= 0 && lpy < ph) overlap++;
+    }
+  }
+  return overlap >= SIL_OVERLAP;
+}
 function topPlatformY() {
   // highest platform top; if none, use a default upper band
   if (G.plat.length === 0) return 60;
@@ -245,7 +294,7 @@ function spawnMiniBoss(b) {
     type, t: 0, dir: Math.random() < 0.5 ? 1 : -1,
     frozen: false, coin: false, speed: 0.4 + Math.random() * 0.2,
     phase: Math.random() * 6.28, jumpCd: 600,
-    mini: true, miniT: 0, dropping: true,
+    mini: true, miniT: 0, dropping: true, hp: 3, hpCd: 0,
     x, y: b.y + b.bh * 0.45, // in front of (just below) the boss's center
     vy: 0,
     surf: 'ground', minX: 8, maxX: CFG.W - 8,
@@ -536,6 +585,16 @@ function respawn() {
   P.x = 70; P.y = CFG.GROUND_Y - CFG.PLAYER_H;
   P.vx = 0; P.vy = 0; P.dead = false; P.grounded = true; P.invuln = 120;
 }
+// Bounce the player off a monster silhouette (P-freeze active): push along the
+// dominant axis of the overlap + damage the monster 1 hit (cooldown-gated).
+function bounceOffEnemy(e) {
+  const dx = P.x + CFG.PLAYER_W / 2 - e.x, dy = P.y + CFG.PLAYER_H / 2 - e.y;
+  if (Math.abs(dx) >= Math.abs(dy)) { P.vx = (dx >= 0 ? 1 : -1) * 3.2; }
+  else { P.vy = (dy >= 0 ? 1 : -1) * 3.0; P.grounded = false; }
+  if (e.mini && e.hpCd === 0) { e.hpCd = 45; }
+  G.shake = 3; haptic('light');
+  beep(320, 0.08, 'square', 0.06);
+}
 </script>
 <script>
 // ================= BOMBS =======================================================
@@ -672,19 +731,45 @@ function fireballStep() {
     fb.x += fb.vx; fb.y += fb.vy;
     // expire off-screen or after 2s
     if (fb.t > 120 || fb.x < 0 || fb.x > CFG.W || fb.y < 0 || fb.y > CFG.H) fb.dead = true;
-    // hit enemies
+    // hit enemies — fireballs hurt monsters: minis/regulars take real damage.
+    // Minis (roach/gorilla replicas) have HP (3 hits); regulars keep one-shot.
     for (const e of G.enemies) {
       if (e.dead || e.coin) continue;
       const eb = enemyBox(e);
       if (rectHit({ x: fb.x - 3, y: fb.y - 3, w: 6, h: 6 }, eb)) {
         fb.dead = true;
-        e.dead = true;
-        const pts = 500 * G.mult;
-        addScore(pts);
-        addPop(e.x, e.y, '' + pts, '#ff4400');
-        haptic('light');
+        if (e.mini && e.hp != null) {
+          e.hp -= 1;
+          if (e.hp <= 0) {
+            e.dead = true;
+            const pts = 500 * G.mult;
+            addScore(pts);
+            addPop(e.x, e.y, '' + pts, '#ff4400');
+            haptic('light');
+          } else {
+            addPop(e.x, e.y, '' + e.hp, '#ff8040');
+            haptic('light');
+          }
+        } else {
+          e.dead = true;
+          const pts = 500 * G.mult;
+          addScore(pts);
+          addPop(e.x, e.y, '' + pts, '#ff4400');
+          haptic('light');
+        }
         break;
       }
+    }
+    // boss hit (screens 1/2) — a fireball does 2 damage, dead at hp <= 0
+    const b = G.boss;
+    if (fb.dead === undefined && b && b.poofT <= 0 && b.hitCd <= 0 &&
+        rectHit({ x: fb.x - 3, y: fb.y - 3, w: 6, h: 6 }, bossBox(b))) {
+      fb.dead = true;
+      b.hp -= 2; b.flashT = 12; b.hitCd = 45;
+      G.shake = 4; haptic('medium');
+      beep(300 - Math.max(0, b.hp) * 15, 0.12, 'square', 0.08);
+      addPop(b.x, b.y - b.bh / 2, '' + Math.max(0, b.hp), '#40f0f0');
+      if (b.hp <= 0) bossPoof(b);
     }
   }
   G.fireballs = G.fireballs.filter(f => !f.dead);
@@ -726,7 +811,7 @@ function spawnEnemy(forceType) {
   const type = forceType && forceType !== 'sacrifice' ? forceType : pool[Math.floor(Math.random() * pool.length)];
   const speed = 0.35 + G.screenIdx * 0.1 + Math.min(0.3, G.elapsed / 24000);
   const dir = Math.random() < 0.5 ? 1 : -1;
-  const base = { type, t: 0, dir, frozen: false, coin: false, speed, phase: Math.random() * 6.28, jumpCd: 600 };
+  const base = { type, t: 0, dir, frozen: false, coin: false, speed, phase: Math.random() * 6.28, jumpCd: 600, hp: 3, hpCd: 0 };
   let surfY, isGround = !!GROUND_TYPES[type];
   if (isGround || G.plat.length === 0) {
     base.surf = 'ground';
@@ -900,20 +985,25 @@ function stepEnemyWalk(e) {
 }
 function enemyStep() {
   if (G.st === ST.PLAY && G.freeze <= 0) {
-    G.spawnT--;
-    if (G.spawnT <= 0) {
-      // On boss screens: half the spawns are mini-replicas of the boss,
-      // the other half use the normal pool MINUS one type (sacrificed).
-      // If minis already dominate (>=4 alive), force a regular spawn so
-      // they can't pile up while you clear the normal enemies.
-      const liveMinis = G.enemies.filter(e => e.mini).length;
-      if (G.boss && Math.random() < 0.5 && liveMinis < 4) {
-        spawnMiniBoss(G.boss);
-      } else {
-        spawnEnemy(G.boss ? 'sacrifice' : null);
+    // After the boss dies, no new enemies spawn — only the minis already on
+    // the screen remain (they patrol until killed).
+    const bossAlive = G.boss && G.boss.poofT <= 0;
+    if (bossAlive) {
+      G.spawnT--;
+      if (G.spawnT <= 0) {
+        // On boss screens: half the spawns are mini-replicas of the boss,
+        // the other half use the normal pool MINUS one type (sacrificed).
+        // If minis already dominate (>=4 alive), force a regular spawn so
+        // they can't pile up while you clear the normal enemies.
+        const liveMinis = G.enemies.filter(e => e.mini).length;
+        if (G.boss && Math.random() < 0.5 && liveMinis < 4) {
+          spawnMiniBoss(G.boss);
+        } else {
+          spawnEnemy(G.boss ? 'sacrifice' : null);
+        }
+        const base = Math.max(35, 120 - G.screenIdx * 18 - Math.floor(G.elapsed / 900) * 5);
+        G.spawnT = base + Math.random() * 40;
       }
-      const base = Math.max(35, 120 - G.screenIdx * 18 - Math.floor(G.elapsed / 900) * 5);
-      G.spawnT = base + Math.random() * 40;
     }
   }
   for (const e of G.enemies) {
@@ -945,13 +1035,19 @@ function enemyStep() {
         }
       }
       // check for player contact even while dropping (minis are lethal on impact)
+      // BOUNCE (not kill) when touching a mini's silhouette with the P-freeze
+      // powerup active; otherwise lethal as before.
       if (!P.dead && P.invuln <= 0 && !e.coin) {
-        if (rectHit({ x: P.x + 1, y: P.y + 1, w: CFG.PLAYER_W - 2, h: CFG.PLAYER_H - 2 }, enemyBox(e))) {
+        const touch = (e.mini && G.freeze > 0) ? silhouetteHit(e) :
+          rectHit({ x: P.x + 1, y: P.y + 1, w: CFG.PLAYER_W - 2, h: CFG.PLAYER_H - 2 }, enemyBox(e));
+        if (touch) {
           if (G.touchKill > 0) {
             e.dead = true;
             addScore(500 * G.mult);
             addPop(e.x, e.y, '' + (500 * G.mult), '#ff40ff');
             haptic('light');
+          } else if (e.mini && G.freeze > 0) {
+            bounceOffEnemy(e);
           } else {
             playerDie();
           }
@@ -971,14 +1067,20 @@ function enemyStep() {
       continue;
     }
     stepEnemyWalk(e);
-    // touch — applies to minis too (they are lethal like regular enemies)
+    // touch — applies to minis too (they are lethal like regular enemies).
+    // BOUNCE (not kill) when touching a mini's silhouette with the P-freeze
+    // powerup active; otherwise lethal as before.
     if (!P.dead && P.invuln <= 0 && !e.coin) {
-      if (rectHit({ x: P.x + 1, y: P.y + 1, w: CFG.PLAYER_W - 2, h: CFG.PLAYER_H - 2 }, enemyBox(e))) {
+      const touch = (e.mini && G.freeze > 0) ? silhouetteHit(e) :
+        rectHit({ x: P.x + 1, y: P.y + 1, w: CFG.PLAYER_W - 2, h: CFG.PLAYER_H - 2 }, enemyBox(e));
+      if (touch) {
         if (G.touchKill > 0) {
           e.dead = true;
           addScore(500 * G.mult);
           addPop(e.x, e.y, '' + (500 * G.mult), '#ff40ff');
           haptic('light');
+        } else if (e.mini && G.freeze > 0) {
+          bounceOffEnemy(e);
         } else {
           playerDie();
         }
@@ -1986,6 +2088,9 @@ function tick() {
   } else if (G.st === ST.PLAY) {
     G.elapsed++;
     if (G.shake > 0) G.shake--;
+    // Advance the real-face animation during play too (boss + minis on screens 1/2)
+    G.faceClock++;
+    if (G.faceClock >= 60 / FACE_FPS) { G.faceClock = 0; G.faceFrame = (G.faceFrame + 1) % FACE_N; }
     playerStep();
     bombStep();
     powerupStep();

@@ -218,5 +218,61 @@ check(minisAfter2 === minisBefore,
   'boss spawned a mini again after a slot freed up (count ' + (minisBefore - 1) + '->' + minisAfter2 + ')',
   'boss did not respawn after slot freed (count ' + minisAfter2 + ')');
 
+// ---- Test 10: fireballs damage the BOSS (2 HP per hit, dead at hp<=0) ----
+S.setScreen(1); // Sobesinho
+S.G.st = S.ST.PLAY;
+S.G.sFire = 300; // S powerup active so fireballStep runs its collision logic
+S.G.boss.hp = 5; S.G.boss.hitCd = 0; S.G.boss.poofT = 0;
+// place a fireball directly on the boss center (no `dead` prop — the game
+// uses `fb.dead === undefined` to detect "not yet hit")
+S.G.fireballs = [{ x: S.G.boss.x, y: S.G.boss.y, vx: 0, vy: 0, t: 0 }];
+S.G.enemies = [];
+S.fireballStep();
+check(S.G.boss && S.G.boss.hp === 3,
+  'fireball hit boss: hp 5->3 (2 per hit, hitCd=' + (S.G.boss && S.G.boss.hitCd) + ')',
+  'boss hp not reduced by fireball (hp=' + (S.G.boss && S.G.boss.hp) + ')');
+// second fireball (clear cooldown) → hp 3->1
+S.G.boss.hitCd = 0;
+S.G.fireballs = [{ x: S.G.boss.x, y: S.G.boss.y, vx: 0, vy: 0, t: 0 }];
+S.fireballStep();
+check(S.G.boss && S.G.boss.hp === 1,
+  'second fireball: hp 3->1', 'hp not 1 after second fireball: ' + (S.G.boss && S.G.boss.hp));
+// third fireball → hp 1 -> -1 → dead (poof)
+S.G.boss.hitCd = 0;
+S.G.fireballs = [{ x: S.G.boss.x, y: S.G.boss.y, vx: 0, vy: 0, t: 0 }];
+S.fireballStep();
+const bossDead = !S.G.boss || S.G.boss.poofT > 0;
+check(bossDead,
+  'third fireball killed boss (hp 1->-1, poofT=' + (S.G.boss && S.G.boss.poofT) + ')',
+  'boss not killed by third fireball (hp=' + (S.G.boss && S.G.boss.hp) + ')');
+
+// ---- Test 11: after boss death, NO new enemy spawns; minis remain ----
+S.setScreen(1);
+S.G.st = S.ST.PLAY;
+S.G.boss = null; // boss dead
+S.G.enemies = [{ mini: true, type: 'gorilla', t: 0, x: 100, y: 200, dir: 1, frozen: false, coin: false, speed: 0.5, phase: 0, jumpCd: 600, dropping: false, hp: 3, surf: 'ground', minX: 8, maxX: 352, baseY: 230 }];
+const enemiesBefore = S.G.enemies.length;
+for (let f = 0; f < 400; f++) {
+  S.G.spawnT = 0; // force spawn attempt every frame
+  S.enemyStep();
+}
+const newOnes = S.G.enemies.filter(e => e !== S.G.enemies[0] && !e.mini).length;
+check(S.G.enemies.length === enemiesBefore,
+  'no new enemies after boss death (count ' + enemiesBefore + '->' + S.G.enemies.length + ')',
+  'new enemies spawned after boss death (count ' + enemiesBefore + '->' + S.G.enemies.length + ')');
+check(S.G.enemies.some(e => e.mini), 'pre-existing mini still present after boss death', 'existing mini disappeared');
+
+// ---- Test 12: while boss ALIVE, spawning still works (regression) ----
+S.setScreen(0);
+S.G.st = S.ST.PLAY;
+S.G.boss = { kind: 'roach', x: 60, y: 40, bw: 23, bh: 48, hp: 10, poofT: 0, hitCd: 0, spawnCd: 1000, frames: S.G.roachFrames };
+S.G.enemies = [];
+for (let f = 0; f < 400; f++) {
+  S.G.spawnT = 0;
+  S.G.freeze = 0;
+  S.enemyStep();
+}
+check(S.G.enemies.length > 0, 'spawning still works while boss alive (' + S.G.enemies.length + ' enemies)', 'no spawning while boss alive');
+
 console.log(ok ? '=== ALL BOSS TESTS PASSED ===' : '=== SOME TESTS FAILED ===');
 process.exit(ok ? 0 : 1);
