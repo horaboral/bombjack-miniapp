@@ -197,6 +197,8 @@ function bossDrawSize(kind) {
 // pixels within a small margin — i.e. they are touching or 1-2px about to.
 const SIL_MARGIN = 2, SIL_OVERLAP = 2;
 const _silScratch = document.createElement('canvas');
+const _hellScratch = document.createElement('canvas');
+const _maskScratch = document.createElement('canvas');
 function silhouetteMask(img) {
   if (!img || !img.complete || !img.naturalWidth) return null;
   const c = document.createElement('canvas');
@@ -306,7 +308,14 @@ function spawnMiniBoss(b) {
 function bossStep() {
   const b = G.boss;
   if (!b) return;
-  if (b.poofT > 0) { b.poofT--; if (b.poofT <= 0) G.boss = null; return; }
+  if (b.poofT > 0) {
+    b.poofT--;
+    // Dead boss lingers on screen (hell-filled silhouette) — it does NOT
+    // vanish; the round clears when the player advances. It stays frozen:
+    // no movement, no mini-spawns, no collision.
+    if (b.poofT <= 0) b.poofT = 999999; // hold forever until setScreen clears
+    return;
+  }
   if (G.st !== ST.PLAY) return;
   if (b.flashT > 0) b.flashT--;
   // invincible unless the player currently has a P (freeze) active — no
@@ -344,12 +353,11 @@ function bossStep() {
     b.spawnCd = 30; // stay on short cooldown until a slot frees up
   }
   if (b.hitCd > 0) b.hitCd--;
-  // Player collision:
+  // Player collision — TRUE silhouette overlap (>=2 real pixels), not AABB.
   //  - WITHOUT P: the boss is invincible and KILLS Bombjack on contact.
   //  - WITH P (freeze): touching it damages it 1/10 (cooldown), bounces the
   //    player off, and does NOT hurt the player.
-  if (!P.dead && P.invuln <= 0 &&
-      rectHit({ x: P.x, y: P.y, w: CFG.PLAYER_W, h: CFG.PLAYER_H }, bossBox(b))) {
+  if (!P.dead && P.invuln <= 0 && silhouetteHit(null, b)) {
     if (!vulnerable) {
       playerDie();
       return;
@@ -367,7 +375,16 @@ function bossStep() {
   }
 }
 function bossPoof(b) {
-  b.poofT = 80;
+  // Death: keep the silhouette, fill it with the animated hell.gif (muppet
+  // head centered). The boss stays on screen (frozen, no collision/spawn)
+  // until the round clears.
+  b.poofT = 600;
+  b._dead = true;
+  const img = b.frames[G.faceFrame];
+  if (img && img.complete) {
+    const m = img._silMask || (img._silMask = silhouetteMask(img));
+    if (m) b._silMask = m;
+  }
   G.bossPoofs.push({ x: b.x, y: b.y, t: 80 });
   // cartoonish "pffft + wobble" sound
   if (typeof AC !== 'undefined' && AC) {
@@ -387,10 +404,50 @@ function bossPoof(b) {
   addScore(5000 * G.mult);
   addPop(b.x, b.y - 10, 'K.O.!', '#f0f040');
 }
+// Draw the dead boss: silhouette (alpha mask) filled with the animated
+// hell.gif, muppet head centered on the boss position.
+function drawDeadBoss(g, b) {
+  const mask = b._silMask;
+  const hell = G.hellImg;
+  if (!mask || !hell || !hell.complete) return;
+  const dx = Math.round(b.x - b.bw / 2), dy = Math.round(b.y - b.bh / 2);
+  // scale the gif to COVER the boss box, head (center of the gif) at the
+  // center of the boss — keep aspect, cover-fit
+  const s = Math.max(b.bw / hell.naturalWidth, b.bh / hell.naturalHeight);
+  const dw = hell.naturalWidth * s, dh = hell.naturalHeight * s;
+  // scratch canvas is mask.w x mask.h and maps 1:1 onto the boss box (b.bw x b.bh).
+  // Express the hell texture (cover-scaled, centered on the boss center) in scratch px.
+  const c = _hellScratch;
+  c.width = mask.w; c.height = mask.h;
+  const cg = c.getContext('2d');
+  cg.clearRect(0, 0, mask.w, mask.h);
+  const sx0 = (b.bw / 2 - dw / 2) * mask.w / b.bw;
+  const sy0 = (b.bh / 2 - dh / 2) * mask.h / b.bh;
+  const sw = dw * mask.w / b.bw, sh = dh * mask.h / b.bh;
+  cg.imageSmoothingEnabled = true;
+  cg.drawImage(hell, 0, 0, hell.naturalWidth, hell.naturalHeight, sx0, sy0, sw, sh);
+  // keep only silhouette pixels (multiply alpha by the mask)
+  cg.globalCompositeOperation = 'destination-in';
+  const mc = _maskScratch;
+  mc.width = mask.w; mc.height = mask.h;
+  const mg = mc.getContext('2d');
+  const md = mg.createImageData(mask.w, mask.h);
+  for (let i = 0; i < mask.m.length; i++) md.data[i * 4 + 3] = mask.m[i] ? 255 : 0;
+  mg.putImageData(md, 0, 0);
+  cg.drawImage(mc, 0, 0);
+  cg.globalCompositeOperation = 'source-over';
+  g.imageSmoothingEnabled = false;
+  g.drawImage(c, dx, dy, b.bw, b.bh);
+  g.imageSmoothingEnabled = true;
+}
 function drawBoss() {
   const b = G.boss;
   if (!b) return;
   const g = cx;
+  if (b._dead) {
+    drawDeadBoss(g, b);
+    // keep the brief poof puffs on top
+  } else {
   const img = b.frames[G.faceFrame];
   if (img && img.complete) {
     g.imageSmoothingEnabled = false;
@@ -400,8 +457,9 @@ function drawBoss() {
     if (flick) g.restore();
     g.imageSmoothingEnabled = true;
   }
-  // poof puffs
-  if (b.poofT > 0) {
+  }
+  // brief poof puffs right at the moment of death (first 80 frames)
+  if (b.poofT > 0 && b.poofT <= 80) {
     const t = 80 - b.poofT;
     for (let i = 0; i < 6; i++) {
       const a = (i / 6) * Math.PI * 2 + t * 0.1;
@@ -1513,6 +1571,13 @@ function loadFaceFrames() {
   // random 45deg diagonal direction each.
   G.bouncers = spawnBouncers();
 }
+// Animated "hell" texture (muppet head) that fills the dead boss's silhouette
+G.hellImg = null;
+function loadHellImg() {
+  const im = new Image();
+  im.onload = () => { G.hellImg = im; };
+  im.src = 'assets/hell.gif';
+}
 const BOUNCE_DIRS = [
   { dx: 1, dy: 1 },  // down-right (45 deg)
   { dx: -1, dy: 1 }, // down-left (135 deg)
@@ -2321,6 +2386,7 @@ window.addEventListener('load', () => {
   buildSprites();
   loadBGImages();
   loadFaceFrames();
+  loadHellImg();
   fit();
   tgInit();
   requestAnimationFrame(frame);

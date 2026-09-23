@@ -57,11 +57,18 @@ runBlock(stateIdx, 'state');
 runBlock(findBlock(b => b.includes('function powerupStep')), 'power');
 runBlock(findBlock(b => b.includes('function enemyStep')), 'enemy');
 const S = sandbox;
-// Fake loaded face frames
+// Fake loaded face frames. The stub canvas getContext returns a Proxy whose
+// property access yields a truthy function, so the game's silhouetteMask()
+// would read an all-1 mask and getImageData would be meaningless. Instead we
+// pre-seed each fake frame with a REAL all-solid mask sized to the frame, so
+// silhouetteHit() behaves like a filled silhouette: the player overlaps the
+// boss's mask exactly when the player is inside the boss bounding box.
 if (!S.G) { console.log('FATAL: G not defined on sandbox'); process.exit(2); }
+function solidMask(w, h) { return { w, h, m: new Uint8Array(w * h).fill(1) }; }
+// roach frames are 72x148, gorilla 54x66 (v6 rescale sizes)
 for (let i = 0; i < 53; i++) {
-  S.G.roachFrames[i] = { complete: true };
-  S.G.gorillaFrames[i] = { complete: true };
+  S.G.roachFrames[i] = { complete: true, naturalWidth: 72, naturalHeight: 148, _silMask: solidMask(72, 148) };
+  S.G.gorillaFrames[i] = { complete: true, naturalWidth: 54, naturalHeight: 66, _silMask: solidMask(54, 66) };
 }
 let ok = 1;
 function check(cond, msg, failmsg) {
@@ -261,6 +268,22 @@ check(S.G.enemies.length === enemiesBefore,
   'no new enemies after boss death (count ' + enemiesBefore + '->' + S.G.enemies.length + ')',
   'new enemies spawned after boss death (count ' + enemiesBefore + '->' + S.G.enemies.length + ')');
 check(S.G.enemies.some(e => e.mini), 'pre-existing mini still present after boss death', 'existing mini disappeared');
+
+// ---- Test 12a: dead boss LINGERS (poofT held, not cleared) + keeps mask ----
+S.setScreen(0);
+S.G.st = S.ST.PLAY;
+S.G.boss.hp = 1; S.G.boss.hitCd = 0;
+S.bossPoof(S.G.boss);
+// the boss should be marked dead, hold its silhouette mask, and not vanish
+check(S.G.boss && S.G.boss._dead === true, 'bossPoof marks boss dead (_dead=true)', 'boss not marked dead');
+check(S.G.boss && S.G.boss._silMask !== undefined, 'dead boss retains silhouette mask for hell fill', 'no mask retained on dead boss');
+// step a few frames: poofT must stay > 0 (held), G.boss must NOT be cleared
+for (let f = 0; f < 100; f++) S.bossStep();
+check(S.G.boss && S.G.boss.poofT > 0, 'dead boss lingers on screen (poofT held at ' + (S.G.boss && S.G.boss.poofT) + ')', 'dead boss vanished (poofT=' + (S.G.boss && S.G.boss.poofT) + ')');
+// drawDeadBoss must not throw headlessly (stub canvas)
+let drawErr = null;
+try { if (S.drawDeadBoss) S.drawDeadBoss(S.cx, S.G.boss); } catch (e) { drawErr = e; }
+check(drawErr === null, 'drawDeadBoss runs headless without error', 'drawDeadBoss threw: ' + (drawErr && drawErr.message));
 
 // ---- Test 12: while boss ALIVE, spawning still works (regression) ----
 S.setScreen(0);
