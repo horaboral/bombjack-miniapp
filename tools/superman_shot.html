@@ -1,0 +1,23 @@
+<!DOCTYPE html><html><head><meta charset="utf-8"><style>
+  body{margin:0;background:#0a0e18;}
+  canvas{display:block;}
+</style></head><body>
+<canvas id="c" width="1500" height="150"></canvas>
+<script>
+// Injected by render_superman_browser.js: window.__drawSupermanS = <fn>
+const SIZE = 9;
+const cell = 150, phases = [0, 10, 20, 30, 40, 50, 60, 70, 80, 90];
+const g = document.getElementById('c').getContext('2d');
+g.fillStyle = '#0a0e18'; g.fillRect(0,0,1500,150);
+for (let i = 0; i < phases.length; i++) {
+  g.save();
+  g.translate(i*cell + 10, 10);
+  g.scale(6, 6); // 9px shield -> 54px
+  window.__drawSupermanS(g, 10, 12, SIZE, phases[i]);
+  g.restore();
+  g.fillStyle = '#c8c8c8'; g.font = '13px monospace';
+  g.fillText('rot ' + phases[i], i*cell + 10, 138);
+}
+document.title = 'done';
+</script>
+</body></html>

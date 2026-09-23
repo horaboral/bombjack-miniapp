@@ -50,14 +50,17 @@ html, body {
 <script>
 "use strict";
 // ================= CONFIG (tunables) =================
+// Global movement scale for gameplay (the title/intro bouncers are NOT scaled).
+// 0.85 = 15% slower than the original pacing.
+const SPEED_SCALE = 0.85;
 const CFG = {
   W: 144, H: 256,          // logical playfield, 9:16 vertical
   FRAME: 0,                // no bezel — full screen
-  GRAV: 0.2,
-  RUN: 2.3,                // px/frame at full steer
-  JUMP_V: 5.0,             // initial jump impulse
-  JUMP_RISE: 0.34,         // extra upward accel while steering up (hold = rise to top)
-  JUMP_MAX_UP: 3.4,        // terminal rise speed while holding
+  GRAV: 0.2 * SPEED_SCALE,
+  RUN: 2.3 * SPEED_SCALE,  // px/frame at full steer
+  JUMP_V: 5.0 * SPEED_SCALE, // initial jump impulse
+  JUMP_RISE: 0.34 * SPEED_SCALE, // extra upward accel while steering up
+  JUMP_MAX_UP: 3.4 * SPEED_SCALE, // terminal rise speed while holding
   JUMP_CUT: 0.42,          // vy multiplier on early release
   RISE_MIN_A: 50 * Math.PI / 180,   // min steer angle (from horizontal) that keeps the rise
   RISE_MAX_A: 130 * Math.PI / 180,  // max steer angle that keeps the rise
@@ -202,6 +205,7 @@ const _hellScratch = document.createElement('canvas');
 const _maskScratch = document.createElement('canvas');
 function silhouetteMask(img) {
   if (!img || !img.complete || !img.naturalWidth) return null;
+  if (img._silMask) return img._silMask; // cached — masks are static per frame
   const c = document.createElement('canvas');
   c.width = img.naturalWidth; c.height = img.naturalHeight;
   const g = c.getContext('2d');
@@ -209,7 +213,8 @@ function silhouetteMask(img) {
   const d = g.getImageData(0, 0, c.width, c.height).data;
   const m = new Uint8Array(c.width * c.height);
   for (let i = 0; i < m.length; i++) m[i] = d[i * 4 + 3] > 40 ? 1 : 0;
-  return { w: c.width, h: c.height, m };
+  img._silMask = { w: c.width, h: c.height, m };
+  return img._silMask;
 }
 // e = {type,x,y,frame} or boss b={kind,x,y,bw,bh}; P = player
 function silhouetteHit(e, b) {
@@ -241,6 +246,42 @@ function silhouetteHit(e, b) {
     }
   }
   return overlap >= SIL_OVERLAP;
+}
+// Monster-vs-monster silhouette overlap (title-screen bouncers). Each bouncer
+// draws a full face frame (roach/gorilla) at its own dest rect, so the true
+// body is the frame's alpha mask — NOT the bounding box. Returns true when the
+// two silhouettes share >= OVERLAP solid pixels within SIL_MARGIN (touching or
+// about to), replacing the old bounding-box "invisible frame" bounce.
+function monsterSilOverlap(a, b, aw, ah, bw, bh) {
+  const ma = silhouetteMask(a);
+  const mb = silhouetteMask(b);
+  if (!ma || !mb) return false;
+  // dest rects in world px (center + half-size), matching the drawImage call
+  const ax0 = Math.round(a.x - aw / 2), ay0 = Math.round(a.y - ah / 2);
+  const bx0 = Math.round(b.x - bw / 2), by0 = Math.round(b.y - bh / 2);
+  // a-local window covering b's rect (+margin), in a-mask pixels
+  const ax1 = ax0 + aw, ay1 = ay0 + ah;
+  let sx0 = Math.max(0, Math.round((bx0 - ax0) / aw * ma.w) - SIL_MARGIN);
+  let sy0 = Math.max(0, Math.round((by0 - ay0) / ah * ma.h) - SIL_MARGIN);
+  let sx1 = Math.min(ma.w, Math.round((bx0 + bw - ax0) / aw * ma.w) + SIL_MARGIN);
+  let sy1 = Math.min(ma.h, Math.round((by0 + bh - ay0) / ah * ma.h) + SIL_MARGIN);
+  if (sx1 <= sx0 || sy1 <= sy0) return false;
+  let ov = 0;
+  for (let sy = sy0; sy < sy1; sy++) {
+    for (let sx = sx0; sx < sx1; sx++) {
+      if (!ma.m[sy * ma.w + sx]) continue;
+      // world px of this a-mask pixel center
+      const wx = ax0 + (sx + 0.5) * aw / ma.w;
+      const wy = ay0 + (sy + 0.5) * ah / ma.h;
+      if (wx < bx0 || wx >= bx0 + bw || wy < by0 || wy >= by0 + bh) continue;
+      // into b-mask pixels
+      const msx = Math.min(mb.w - 1, Math.max(0, Math.floor((wx - bx0) / bw * mb.w)));
+      const msy = Math.min(mb.h - 1, Math.max(0, Math.floor((wy - by0) / bh * mb.h)));
+      if (mb.m[msy * mb.w + msx]) ov++;
+      if (ov >= SIL_OVERLAP) return true;
+    }
+  }
+  return ov >= SIL_OVERLAP;
 }
 function topPlatformY() {
   // highest platform top; if none, use a default upper band
@@ -295,7 +336,7 @@ function spawnMiniBoss(b) {
   const surfY = surfaceAtX(x);
   const e = {
     type, t: 0, dir: Math.random() < 0.5 ? 1 : -1,
-    frozen: false, coin: false, speed: 0.4 + Math.random() * 0.2,
+    frozen: false, coin: false, speed: (0.4 + Math.random() * 0.2) * SPEED_SCALE,
     phase: Math.random() * 6.28, jumpCd: 600,
     mini: true, miniT: 0, dropping: true, hp: 3, hpCd: 0,
     x, y: b.y + b.bh * 0.45, // in front of (just below) the boss's center
@@ -322,8 +363,8 @@ function bossStep() {
   // damage or bounce while freeze has ended
   const vulnerable = G.freeze > 0;
   // bounce movement like the title screen (45deg diagonal, wall + platform rebound)
-  const dx = (b.dir & 1) ? -b.speed : b.speed;
-  const dy = (b.dir & 2) ? -b.speed : b.speed;
+  const dx = ((b.dir & 1) ? -b.speed : b.speed) * SPEED_SCALE;
+  const dy = ((b.dir & 2) ? -b.speed : b.speed) * SPEED_SCALE;
   let nx = b.x + dx, ny = b.y + dy;
   const margin = 16;
   // walls: keep the WHOLE body inside the playfield
@@ -674,8 +715,8 @@ function bombStep() {
   for (let i = Math.max(0, litActive.length - LIT_MOVERS); i < litActive.length; i++) litActive[i].mover = true;
   for (const b of active) {
     if (b.lit && b.mover) {
-      b.pat = (b.pat || 0) + 0.012;
-      b.x += Math.cos(b.pat) * 0.035;
+      b.pat = (b.pat || 0) + 0.012 * SPEED_SCALE;
+      b.x += Math.cos(b.pat) * 0.035 * SPEED_SCALE;
     }
   }
   const pb = { x: P.x, y: P.y, w: CFG.PLAYER_W, h: CFG.PLAYER_H };
@@ -711,7 +752,7 @@ function spawnPowerup() {
   const L = r < 0.45 ? 'P' : r < 0.65 ? 'B' : r < 0.85 ? 'E' : 'S';
   // spawn with a random 45deg diagonal direction (bounce off external borders)
   const dir = Math.floor(Math.random() * 4); // 0=TR, 1=BR, 2=BL, 3=TL
-  const sp = 0.5;
+  const sp = 0.5 * SPEED_SCALE;
   const vx = (dir & 1) ? sp : -sp;
   const vy = (dir & 2) ? sp : -sp;
   G.powerups.push({ x: 6 + Math.random() * (CFG.W - 12), y: 30 + Math.random() * 70, L, vx, vy, t: 0 });
@@ -723,7 +764,7 @@ function powerupStep() {
   if (G.pTimer >= 900) { // 900 frames = 15s @ 60fps
     G.pTimer = 0;
     const dir = Math.floor(Math.random() * 4);
-    const sp = 0.5;
+    const sp = 0.5 * SPEED_SCALE;
     const vx = (dir & 1) ? sp : -sp;
     const vy = (dir & 2) ? sp : -sp;
     G.powerups.push({ x: 6 + Math.random() * (CFG.W - 12), y: 30 + Math.random() * 70, L: 'P', vx, vy, t: 0 });
@@ -781,7 +822,7 @@ function fireballStep() {
       // 2 balls each side: slightly angled up
       for (const side of [1, -1]) {
         for (const ang of [-0.3, 0.3]) {
-          G.fireballs.push({ x: px + side * 6, y: py, vx: side * 2.5, vy: ang * 2, t: 0 });
+          G.fireballs.push({ x: px + side * 6, y: py, vx: side * 2.5 * SPEED_SCALE, vy: ang * 2 * SPEED_SCALE, t: 0 });
         }
       }
     }
@@ -843,7 +884,7 @@ function dropCoin(x, y) {
 }
 function coinStep() {
   for (const c of G.coins) {
-    c.t++; c.vy += 0.12; c.y += c.vy;
+    c.t++; c.vy += 0.12 * SPEED_SCALE; c.y += c.vy;
     if (c.y > CFG.GROUND_Y - 3) { c.y = CFG.GROUND_Y - 3; c.vy = 0; }
     if (c.t > 240) c.dead = true;
     if (!c.dead && !P.dead &&
@@ -870,7 +911,7 @@ function spawnEnemy(forceType) {
   // take half the spawn slots
   if (forceType === 'sacrifice') pool = pool.slice(1);
   const type = forceType && forceType !== 'sacrifice' ? forceType : pool[Math.floor(Math.random() * pool.length)];
-  const speed = 0.35 + G.screenIdx * 0.1 + Math.min(0.3, G.elapsed / 24000);
+  const speed = (0.35 + G.screenIdx * 0.1 + Math.min(0.3, G.elapsed / 24000)) * SPEED_SCALE;
   const dir = Math.random() < 0.5 ? 1 : -1;
   const base = { type, t: 0, dir, frozen: false, coin: false, speed, phase: Math.random() * 6.28, jumpCd: 600, hp: 3, hpCd: 0 };
   let surfY, isGround = !!GROUND_TYPES[type];
@@ -1073,7 +1114,7 @@ function enemyStep() {
     // SOLID — it lands on the first surface under it and stops.
     if (e.mini && e.dropping) {
       e.miniT++;
-      e.vy = Math.min(e.vy + 0.08, 1.2);
+      e.vy = Math.min(e.vy + 0.08 * SPEED_SCALE, 1.2 * SPEED_SCALE);
       e.y += e.vy;
       // find the highest surface BELOW the spawn position
       let surfY = CFG.GROUND_Y;
@@ -1625,14 +1666,20 @@ function bouncerStep() {
     if (b.y < m) { b.y = m; b.dir = (b.dir & 1) | 0; }           // top -> dy=+1 (bounce down)
     else if (b.y > CFG.H - m) { b.y = CFG.H - m; b.dir = (b.dir & 1) | 2; } // bottom -> dy=-1 (bounce up)
   }
-  // Mutual collision: both reverse 180 degrees (flip dx AND dy).
+  // Mutual collision: bounce ONLY when the two real silhouettes touch (or are
+  // within SIL_MARGIN of touching) — NOT the bounding box. Both reverse 180°.
   const [a, b] = bs;
-  if (Math.abs(a.x - b.x) < (BOUNCE_W[0] + BOUNCE_W[1]) / 2 &&
-      Math.abs(a.y - b.y) < (BOUNCE_H[0] + BOUNCE_H[1]) / 2) {
-    a.dir ^= 3; b.dir ^= 3; // flip both axis bits
-    // Separate them so they don't re-collide next frame
-    const push = a.x < b.x ? -3 : 3;
-    a.x += push; b.x -= push;
+  const aImg = G.roachFrames[G.faceFrame], bImg = G.gorillaFrames[G.faceFrame];
+  if (aImg && aImg.complete && bImg && bImg.complete) {
+    // cheap bounding-box pre-filter, then the true pixel test
+    if (Math.abs(a.x - b.x) < (BOUNCE_W[0] + BOUNCE_W[1]) / 2 + 4 &&
+        Math.abs(a.y - b.y) < (BOUNCE_H[0] + BOUNCE_H[1]) / 2 + 4 &&
+        monsterSilOverlap(aImg, bImg, BOUNCE_W[0], BOUNCE_H[0], BOUNCE_W[1], BOUNCE_H[1])) {
+      a.dir ^= 3; b.dir ^= 3; // flip both axis bits
+      // Separate them so they don't re-collide next frame
+      const push = a.x < b.x ? -3 : 3;
+      a.x += push; b.x -= push;
+    }
   }
 }
 function drawBG(s, t) {
@@ -1794,43 +1841,52 @@ function drawMitsubishi(g, x, y, size, rotT) {
   for (let i = 0; i < 3; i++) rhombus(-Math.PI / 2 + i * (2 * Math.PI / 3));
   g.restore();
 }
-// Superman shield — grey/dark, carved into the pill, S cut out (white shows
-// through). Carving = soft grey drop-shadow under the shield + white S punched
-// through to the pill surface.
+// Superman shield logo (the real emblem, not a letter): red shield with a gold
+// border and a gold S. No separate "S" character — the S IS the logo.
+// The coin-spin shows the coin's EDGE: zScale = |cos| runs all the way to 0, so
+// the thin sliver (the coin's thickness) is drawn instead of being skipped.
 function drawSupermanS(g, x, y, size, rotT) {
-  const w = size * 1.55, h = size * 1.55;
-  drawPillBase(g, x, y, '#9aa0a6', rotT); // grey border — carved, not red
-  const zScale = Math.max(0.25, Math.abs(Math.cos(rotT * 0.04)));
-  g.save();
-  g.translate(x, y);
-  g.scale(zScale, 1);
-  const s = size * 0.52; // shield half-extent
-  // shield outline (flat top, slanted shoulders, pointy bottom)
+  const R = size * 0.95; // shield radius (half-width)
+  const z = Math.abs(Math.cos(rotT * 0.05)); // 0 (edge-on) .. 1 (face-on)
+  const s = R * (0.2 + 0.8 * z);             // shield width, edge-on sliver kept
+  const hgt = R * 1.25;                       // shield height (vertical, unscaled)
+  // shield outline: flat top, slanted shoulders, pointy bottom
   function shieldPath() {
     g.beginPath();
-    g.moveTo(-s, -s * 0.62);
-    g.lineTo(s, -s * 0.62);
-    g.lineTo(s * 0.92, -s * 0.18);
-    g.lineTo(0, s * 1.05);
-    g.lineTo(-s * 0.92, -s * 0.18);
+    g.moveTo(-s, -hgt * 0.62);
+    g.lineTo(s, -hgt * 0.62);
+    g.lineTo(s * 0.92, -hgt * 0.18);
+    g.lineTo(0, hgt * 1.02);
+    g.lineTo(-s * 0.92, -hgt * 0.18);
     g.closePath();
   }
-  // carving shadow (offset down-right, soft)
-  shieldPath();
   g.save();
-  g.translate(s * 0.10, s * 0.14);
-  g.fillStyle = 'rgba(40,40,46,0.45)';
-  g.fill();
-  g.restore();
-  // shield body (dark grey)
+  g.translate(x, y);
+  // shield body: red with a gold border
   shieldPath();
-  g.fillStyle = '#565b61';
+  g.lineWidth = Math.max(0.6, R * 0.16 * z + 0.4);
+  g.strokeStyle = '#f2c200'; // gold border
+  g.stroke();
+  g.fillStyle = '#d81f26';   // red field
   g.fill();
-  // S cut out — white pill shows through the carving
-  g.fillStyle = '#fff';
-  g.font = 'bold ' + Math.round(s * 2.1) + 'px sans-serif';
-  g.textAlign = 'center'; g.textBaseline = 'middle';
-  g.fillText('S', 0, s * 0.10);
+  // gold S emblem: a single thick stroked S-curve (top hook -> bottom hook)
+  const sw = s * 0.62, sh = hgt * 0.30;
+  g.beginPath();
+  g.moveTo(sw * 0.85, -sh * 0.85);
+  g.quadraticCurveTo(-sw * 0.95, -sh * 1.05, -sw * 0.55, -sh * 0.05);
+  g.quadraticCurveTo(-sw * 0.30, sh * 0.42, sw * 0.28, sh * 0.45);
+  g.quadraticCurveTo(sw * 0.95, sh * 0.48, sw * 0.85, sh * 0.95);
+  g.lineWidth = Math.max(1.0, s * 0.42);
+  g.lineCap = 'round';
+  g.strokeStyle = '#f2c200';
+  g.stroke();
+  // edge sliver: a thin gold strip on the side the coin faces, only visible
+  // near edge-on (this is the coin's thickness — the part the old spin skipped)
+  if (z < 0.9) {
+    const edgeW = Math.max(0.4, (1 - z) * R * 0.5);
+    g.fillStyle = '#caa000';
+    g.fillRect(z < 0.5 ? -s - edgeW : s, -hgt * 0.55, edgeW, hgt * 1.0);
+  }
   g.restore();
 }
 // B / E powerup — letter on a pill (blue border), same footprint

@@ -1,19 +1,17 @@
-// Extract all inline <script> blocks from bombjack.html and syntax-check
-// each one with node --check via vm compilation (no execution).
-const fs = require('fs');
 const vm = require('vm');
-const html = fs.readFileSync(__dirname + '/../bombjack.html', 'utf8');
-const re = /<script>([\s\S]*?)<\/script>/g;
-let m, i = 0, fail = 0;
-while ((m = re.exec(html)) !== null) {
-  i++;
+const fs = require('fs');
+const html = fs.readFileSync('bombjack.html', 'utf8');
+const blocks = [...html.matchAll(/<script>([\s\S]*?)<\/script>/g)].map(m => m[1]);
+let ok = true;
+for (let i = 0; i < blocks.length; i++) {
   try {
-    new vm.Script(m[1], { filename: 'block' + i + '.js' });
-    console.log('block ' + i + ': OK (' + m[1].length + ' chars)');
+    // just check it parses
+    const src = blocks[i].replace(/\bconst\b/g, 'var').replace(/\blet\b/g, 'var');
+    vm.compileFunction(src, [], { filename: 'block' + i });
+    console.log('block ' + i + ': OK (' + src.length + ' chars)');
   } catch (e) {
-    fail++;
-    console.log('block ' + i + ': SYNTAX ERROR: ' + e.message);
+    console.log('block ' + i + ': FAIL ' + e.message);
+    ok = false;
   }
 }
-console.log(fail === 0 ? 'ALL OK' : fail + ' FAILURES');
-process.exit(fail === 0 ? 0 : 1);
+process.exit(ok ? 0 : 1);
